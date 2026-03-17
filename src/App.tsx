@@ -79,6 +79,11 @@ const getLocalDB = () => {
     if (!parsed.geminiApiKey || parsed.geminiApiKey === "MY_GEMINI_API_KEY") {
       parsed.geminiApiKey = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
     }
+    // Force update to the correct Supabase Key if it's missing or old
+    if (!parsed.supabaseKey || parsed.supabaseKey.startsWith('sb_publishable')) {
+      parsed.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eG11dmZiaGxlaWpseW5zZGJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMjE5MDcsImV4cCI6MjA1NzgxNzkwN30.2M0-L9T8uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7";
+      parsed.supabaseUrl = "https://ayxmuvfbhleijlynsdbv.supabase.co";
+    }
     localStorage.setItem('lawyer_app_db', JSON.stringify(parsed));
     return parsed;
   }
@@ -89,7 +94,7 @@ const getLocalDB = () => {
     resetRequests: [],
     geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
-    supabaseKey: "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
+    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eG11dmZiaGxlaWpseW5zZGJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMjE5MDcsImV4cCI6MjA1NzgxNzkwN30.2M0-L9T8uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7" 
   };
   localStorage.setItem('lawyer_app_db', JSON.stringify(initialDB));
   return initialDB;
