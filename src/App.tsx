@@ -2887,9 +2887,29 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
   };
 
   const handleReset = async (phone: string) => {
+    const user = data.users.find((u: any) => u.phone === phone);
     const updatedResets = data.resetRequests.filter((r: any) => r.phone !== phone);
-    await updateData({ resetRequests: updatedResets });
-    showToast('تم إغلاق طلب الاستعادة', 'success');
+    
+    if (user) {
+      // إرسال إشعار للمستخدم بكلمة مروره
+      const notification = { 
+        id: Date.now().toString(), 
+        title: 'استعادة كلمة المرور', 
+        desc: `تمت مراجعة طلبك. كلمة المرور الخاصة بك هي: ${user.password}`, 
+        timestamp: new Date().toISOString(), 
+        read: false 
+      };
+      const updatedUsers = data.users.map((u: any) => {
+        if (u.phone === phone) {
+          return { ...u, notifications: [notification, ...(u.notifications || [])] };
+        }
+        return u;
+      });
+      await updateData({ resetRequests: updatedResets, users: updatedUsers });
+    } else {
+      await updateData({ resetRequests: updatedResets });
+    }
+    showToast('تم إرسال كلمة المرور للمستخدم بنجاح', 'success');
   };
 
   const sendNotification = async () => {
@@ -3076,7 +3096,7 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
                 <p className="text-xs text-slate-500">{r.phone}</p>
                 <p className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleString('ar-EG')}</p>
               </div>
-              <button onClick={() => handleReset(r.phone)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm">تم التواصل</button>
+              <button onClick={() => handleReset(r.phone)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition-colors">إرسال كلمة المرور</button>
             </motion.div>
           )) : <div className="text-center py-12 text-slate-400">
             <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
