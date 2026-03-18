@@ -75,19 +75,19 @@ const getLocalDB = () => {
   const data = localStorage.getItem('lawyer_app_db');
   if (data) {
     const parsed = JSON.parse(data);
-    // Ensure the new API key is set if not already present or if it's the old placeholder
-    if (!parsed.geminiApiKey || parsed.geminiApiKey === "MY_GEMINI_API_KEY") {
-      parsed.geminiApiKey = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
+    // Add a version check to invalidate old local storage structures
+    if (!parsed.version || parsed.version < 2) {
+      localStorage.removeItem('lawyer_app_db');
+      return null; // Force re-initialization
     }
-    // Force update to the correct Supabase Key if it's missing or old
-    if (!parsed.supabaseKey || parsed.supabaseKey.startsWith('sb_publishable')) {
-      parsed.supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eG11dmZiaGxlaWpseW5zZGJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMjE5MDcsImV4cCI6MjA1NzgxNzkwN30.2M0-L9T8uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7";
-      parsed.supabaseUrl = "https://ayxmuvfbhleijlynsdbv.supabase.co";
-    }
-    localStorage.setItem('lawyer_app_db', JSON.stringify(parsed));
     return parsed;
   }
+  return null; // No local data, initialize from scratch
+};
+
+const initializeDB = () => {
   const initialDB = { 
+    version: 2,
     users: [
       { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin" }
     ], 
@@ -127,7 +127,8 @@ const syncToSupabase = async (newDb: any) => {
 };
 
 const loadFromSupabase = async () => {
-  const db = getLocalDB();
+  let db = getLocalDB();
+  if (!db) db = initializeDB(); // Initialize if local storage is cleared
   const supabase = getSupabase();
   if (!supabase) return db;
   try {
