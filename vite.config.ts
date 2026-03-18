@@ -27,6 +27,7 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
+      outDir: 'docs',
       target: "esnext",
       assetsInlineLimit: 100000000, // 100MB
       chunkSizeWarningLimit: 100000,
