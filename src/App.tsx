@@ -170,6 +170,9 @@ const mockFetch = async (url: string, options: any = {}) => {
   } catch (e) {
     console.error("Failed to load from Supabase:", e);
     currentDb = getLocalDB();
+    if (!currentDb) {
+      currentDb = initializeDB();
+    }
   }
 
   if (url === '/api/auth/signup') {
