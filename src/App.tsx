@@ -113,9 +113,46 @@ const getSupabase = () => {
   return null;
 };
 
-const mockFetch = async (url: string, options: any = {}) => {
+const syncToSupabase = async (newDb: any) => {
   const supabase = getSupabase();
-  let db = await loadFromSupabase(); // Always load from cloud first
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('app_data')
+      .upsert({ id: 1, content: newDb });
+    if (error) console.error('Supabase Sync Error:', error);
+  } catch (e) {
+    console.error('Supabase Connection Error:', e);
+  }
+};
+
+const loadFromSupabase = async () => {
+  const db = getLocalDB();
+  const supabase = getSupabase();
+  if (!supabase) return db;
+  try {
+    const { data, error } = await supabase
+      .from('app_data')
+      .select('content')
+      .eq('id', 1);
+    
+    if (error) {
+      console.warn('Supabase fetch error:', error.message);
+      return db;
+    }
+
+    if (data && data.length > 0 && data[0].content) {
+      const merged = { ...db, ...data[0].content };
+      saveLocalDB(merged);
+      return merged;
+    }
+  } catch (e) {
+    console.warn('Critical Supabase error, falling back to local storage.');
+  }
+  return db;
+};
+
+const mockFetch = async (url: string, options: any = {}) => {
   const body = options.body ? JSON.parse(options.body) : null;
 
   const createResponse = (ok: boolean, status: number, data: any) => ({
@@ -125,52 +162,13 @@ const mockFetch = async (url: string, options: any = {}) => {
     text: async () => JSON.stringify(data)
   });
 
-  // --- Supabase Data Sync Logic ---
-  const syncToSupabase = async (newDb: any) => {
-    if (!supabase) return;
-    try {
-      // We store the whole DB as a single row for simplicity in this setup
-      const { error } = await supabase
-        .from('app_data')
-        .upsert({ id: 1, content: newDb });
-      if (error) console.error('Supabase Sync Error:', error);
-    } catch (e) {
-      console.error('Supabase Connection Error:', e);
-    }
-  };
-
-  const loadFromSupabase = async () => {
-    const supabase = getSupabase();
-    if (!supabase) return db;
-    try {
-      const { data, error } = await supabase
-        .from('app_data')
-        .select('content')
-        .eq('id', 1);
-      
-      if (error) {
-        console.warn('Supabase fetch error:', error.message);
-        return db;
-      }
-
-      if (data && data.length > 0 && data[0].content) {
-        const merged = { ...db, ...data[0].content };
-        saveLocalDB(merged);
-        return merged;
-      }
-    } catch (e) {
-      console.warn('Critical Supabase error, falling back to local storage.');
-    }
-    return db;
-  };
-
   // For all requests, we try to load fresh from Supabase to ensure data consistency across devices
   let currentDb;
   try {
     currentDb = await loadFromSupabase();
   } catch (e) {
     console.error("Failed to load from Supabase:", e);
-    currentDb = db;
+    currentDb = getLocalDB();
   }
 
   if (url === '/api/auth/signup') {
