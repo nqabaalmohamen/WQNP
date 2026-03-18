@@ -99,7 +99,7 @@ const initializeDB = () => {
     resetRequests: [],
     geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
-    supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5eG11dmZiaGxlaWpseW5zZGJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMjE5MDcsImV4cCI6MjA1NzgxNzkwN30.2M0-L9T8uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7uG2-L7" 
+    supabaseKey: "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
   };
   localStorage.setItem('lawyer_app_db', JSON.stringify(initialDB));
   return initialDB;
