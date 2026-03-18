@@ -76,10 +76,9 @@ const getLocalDB = () => {
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      // Add a version check to invalidate old local storage structures
-      if (!parsed.version || parsed.version < 2) {
+      if (!parsed.version || parsed.version < 3) {
         localStorage.removeItem('lawyer_app_db');
-        return initializeDB(); // Re-initialize
+        return initializeDB();
       }
       return parsed;
     } catch (e) {
@@ -87,15 +86,37 @@ const getLocalDB = () => {
       return initializeDB();
     }
   }
-  return initializeDB(); // No local data, initialize from scratch
+  return initializeDB();
 };
 
 const initializeDB = () => {
   const initialDB = { 
-    version: 2,
+    version: 3,
     users: [
-      { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin" }
+      { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin", notifications: [] }
     ], 
+    cases: [
+      { id: '1', title: 'دعوى صحة توقيع', court: 'محكمة الفيوم الابتدائية', number: '1234/2025', status: 'قيد التداول', date: '2026-04-10' },
+      { id: '2', title: 'استئناف مدني', court: 'محكمة استئناف بني سويف', number: '567/2025', status: 'محجوزة للحكم', date: '2026-03-15' },
+    ],
+    clients: [
+      { id: '1', name: 'أحمد محمد علي', phone: '01012345678', type: 'client' },
+      { id: '2', name: 'شركة النيل للمقاولات', phone: '01298765432', type: 'client' },
+      { id: '3', name: 'محمود حسن إبراهيم', phone: '01155667788', type: 'opponent' },
+    ],
+    tasks: [
+      { id: '1', title: 'سحب ملف القضية 1234', completed: false, date: '2026-03-10' },
+      { id: '2', title: 'سداد رسوم الاستئناف', completed: true, date: '2026-03-08' },
+      { id: '3', title: 'مقابلة موكل جديد', completed: false, date: '2026-03-12' },
+    ],
+    sessions: [
+      { id: '1', caseTitle: 'دعوى صحة توقيع', court: 'مدني الفيوم', date: '2026-03-10', time: '09:00 ص' },
+      { id: '2', caseTitle: 'استئناف مدني', court: 'استئناف عالي', date: '2026-03-15', time: '10:30 ص' },
+    ],
+    reminders: [
+      { id: '1', title: 'مراجعة ملف قضية أحمد محمد', time: '10:00' },
+      { id: '2', title: 'سداد اشتراك النقابة', time: '12:00' },
+    ],
     resetRequests: [],
     geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
@@ -109,9 +130,7 @@ const saveLocalDB = (db: any) => {
   localStorage.setItem('lawyer_app_db', JSON.stringify(db));
 };
 
-// --- Supabase Integration ---
-const getSupabase = () => {
-  const db = getLocalDB();
+const getSupabase = (db: any) => {
   if (db.supabaseUrl && db.supabaseKey) {
     return createClient(db.supabaseUrl, db.supabaseKey);
   }
@@ -119,7 +138,7 @@ const getSupabase = () => {
 };
 
 const syncToSupabase = async (newDb: any) => {
-  const supabase = getSupabase();
+  const supabase = getSupabase(newDb);
   if (!supabase) return;
   try {
     const { error } = await supabase
@@ -132,10 +151,9 @@ const syncToSupabase = async (newDb: any) => {
 };
 
 const loadFromSupabase = async () => {
-  let db = getLocalDB();
-  if (!db) db = initializeDB(); // Initialize if local storage is cleared
-  const supabase = getSupabase();
-  if (!supabase) return db;
+  const localDb = getLocalDB();
+  const supabase = getSupabase(localDb);
+  if (!supabase) return localDb;
   try {
     const { data, error } = await supabase
       .from('app_data')
@@ -144,23 +162,22 @@ const loadFromSupabase = async () => {
     
     if (error) {
       console.warn('Supabase fetch error:', error.message);
-      return db;
+      return localDb;
     }
 
     if (data && data.length > 0 && data[0].content) {
-      const merged = { ...db, ...data[0].content };
-      saveLocalDB(merged);
-      return merged;
+      const cloudDb = data[0].content;
+      saveLocalDB(cloudDb);
+      return cloudDb;
     }
   } catch (e) {
     console.warn('Critical Supabase error, falling back to local storage.');
   }
-  return db;
+  return localDb;
 };
 
 const mockFetch = async (url: string, options: any = {}) => {
   const body = options.body ? JSON.parse(options.body) : null;
-
   const createResponse = (ok: boolean, status: number, data: any) => ({
     ok,
     status,
@@ -168,17 +185,8 @@ const mockFetch = async (url: string, options: any = {}) => {
     text: async () => JSON.stringify(data)
   });
 
-  // For all requests, we try to load fresh from Supabase to ensure data consistency across devices
-  let currentDb;
-  try {
-    currentDb = await loadFromSupabase();
-  } catch (e) {
-    console.error("Failed to load from Supabase:", e);
-    currentDb = getLocalDB();
-    if (!currentDb) {
-      currentDb = initializeDB();
-    }
-  }
+  // Always fetch fresh from cloud for every API call
+  let currentDb = await loadFromSupabase();
 
   if (url === '/api/auth/signup') {
     if (currentDb.users.find((u: any) => u.phone === body.phone)) {
@@ -1037,15 +1045,15 @@ const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, no
 
 };
 
-const MyOfficeScreen = ({ onBack }: { onBack: () => void }) => {
+const MyOfficeScreen = ({ onBack, cases, clients, tasks, sessions, reminders }: { onBack: () => void, cases: Case[], clients: Client[], tasks: Task[], sessions: Session[], reminders: Reminder[] }) => {
   const navigate = useNavigate();
   return (
     <div className="pb-24">
       <Header title="مكتبي" onBack={onBack} />
       <div className="p-4 space-y-6">
         <div className="grid grid-cols-2 gap-4">
-          <ActionCard icon={CalendarIcon} title="الأجندة" subtitle="جدول الأعمال اليومي" color="bg-blue-600" onClick={() => navigate('/agenda')} />
-          <ActionCard icon={Clock} title="التذكيرات" subtitle="تنبيهات المواعيد" color="bg-blue-500" onClick={() => navigate('/reminders')} />
+          <ActionCard icon={CalendarIcon} title="الأجندة" subtitle={`${sessions.length} جلسات`} color="bg-blue-600" onClick={() => navigate('/agenda')} />
+          <ActionCard icon={Clock} title="التذكيرات" subtitle={`${reminders.length} تذكير`} color="bg-blue-500" onClick={() => navigate('/reminders')} />
         </div>
 
         <div className="pt-4">
@@ -1054,9 +1062,9 @@ const MyOfficeScreen = ({ onBack }: { onBack: () => void }) => {
             <h3 className="font-bold text-lg">إدارة القضايا والموكلين</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ActionCard icon={Scale} title="القضايا" subtitle="إدارة ومتابعة جميع القضايا" color="bg-blue-500" onClick={() => navigate('/cases')} />
-            <ActionCard icon={UserCheck} title="الموكلين" subtitle="بيانات ومتابعة الموكلين" color="bg-blue-600" onClick={() => navigate('/clients')} />
-            <ActionCard icon={UserX} title="الخصوم" subtitle="إدارة ومتابعة الخصوم" color="bg-blue-400" onClick={() => navigate('/opponents')} />
+            <ActionCard icon={Scale} title="القضايا" subtitle={`${cases.length} قضية مسجلة`} color="bg-blue-500" onClick={() => navigate('/cases')} />
+            <ActionCard icon={UserCheck} title="الموكلين" subtitle={`${clients.filter(c=>c.type==='client').length} موكل`} color="bg-blue-600" onClick={() => navigate('/clients')} />
+            <ActionCard icon={UserX} title="الخصوم" subtitle={`${clients.filter(c=>c.type==='opponent').length} خصم`} color="bg-blue-400" onClick={() => navigate('/opponents')} />
             <ActionCard icon={CalendarIcon} title="الجلسات" subtitle="جدولة ومتابعة الجلسات" color="bg-blue-700" onClick={() => navigate('/sessions')} />
           </div>
         </div>
@@ -1067,7 +1075,7 @@ const MyOfficeScreen = ({ onBack }: { onBack: () => void }) => {
             <h3 className="font-bold text-lg">الأعمال والمهام</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <ActionCard icon={ShieldCheck} title="الأعمال الإدارية" subtitle="متابعة المهام الإدارية" color="bg-green-600" onClick={() => navigate('/tasks')} />
+            <ActionCard icon={ShieldCheck} title="الأعمال الإدارية" subtitle={`${tasks.filter(t=>!t.completed).length} مهام قائمة`} color="bg-green-600" onClick={() => navigate('/tasks')} />
             <ActionCard icon={FileText} title="المحضرين" subtitle="إدارة المحضرين والإجراءات" color="bg-green-500" onClick={() => navigate('/bailiffs')} />
             <ActionCard icon={PenTool} title="الأعمال الكتابية" subtitle="كتابة العرائض والمذكرات" color="bg-green-400" onClick={() => navigate('/writing')} />
           </div>
@@ -2729,8 +2737,7 @@ const SignupScreen = ({ onSignup, showToast }: { onSignup: () => void, showToast
   );
 };
 
-const AdminDashboard = ({ onBack, showToast, requestConfirm }: { onBack: () => void, showToast: any, requestConfirm: any }) => {
-  const [data, setData] = useState<{ users: any[], resetRequests: any[] }>({ users: [], resetRequests: [] });
+const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }: { data: any, updateData: any, onBack: () => void, showToast: any, requestConfirm: any }) => {
   const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings'>('pending');
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyDesc, setNotifyDesc] = useState('');
@@ -2739,52 +2746,32 @@ const AdminDashboard = ({ onBack, showToast, requestConfirm }: { onBack: () => v
   const [notificationMessage, setNotificationMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingUser, setEditingUser] = useState<any | null>(null);
+  
   const [geminiKey, setGeminiKey] = useState(data.geminiApiKey || '');
   const [supabaseUrl, setSupabaseUrl] = useState(data.supabaseUrl || '');
   const [supabaseKey, setSupabaseKey] = useState(data.supabaseKey || '');
 
-  const saveGeminiKey = () => {
-    const db = getLocalDB();
-    db.geminiApiKey = geminiKey;
-    saveLocalDB(db);
-    setData({ ...data, geminiApiKey: geminiKey });
+  const saveGeminiKey = async () => {
+    await updateData({ geminiApiKey: geminiKey });
     showToast('تم حفظ مفتاح الذكاء الاصطناعي بنجاح', 'success');
   };
 
   const saveSupabaseConfig = async () => {
-    const db = getLocalDB();
-    db.supabaseUrl = supabaseUrl || "https://ayxmuvfbhleijlynsdbv.supabase.co";
-    db.supabaseKey = supabaseKey || "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy";
-    saveLocalDB(db);
-    setData({ ...data, supabaseUrl: db.supabaseUrl, supabaseKey: db.supabaseKey });
-    
-    // محاولة المزامنة الفورية للبيانات المحلية إلى Supabase
-    const supabase = createClient(db.supabaseUrl, db.supabaseKey);
-    try {
-      const { error } = await supabase
-        .from('app_data')
-        .upsert({ id: 1, content: db });
-      if (error) throw error;
-      showToast('تم تفعيل الربط ومزامنة كافة البيانات بنجاح', 'success');
-    } catch (e) {
-      console.error('Sync error:', e);
-      showToast('تم حفظ الإعدادات، ولكن فشلت المزامنة الفورية. سيتم المحاولة لاحقاً.', 'info');
-    }
-    
-    setTimeout(() => window.location.reload(), 1500);
+    await updateData({ 
+      supabaseUrl: supabaseUrl || "https://ayxmuvfbhleijlynsdbv.supabase.co", 
+      supabaseKey: supabaseKey || "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
+    });
+    showToast('تم تحديث إعدادات السحابة بنجاح', 'success');
+    setTimeout(() => window.location.reload(), 1000);
   };
 
   const exportData = () => {
     try {
-      const db = getLocalDB();
-      const dataStr = JSON.stringify(db, null, 2);
+      const dataStr = JSON.stringify(data, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `lawyer_app_backup_${new Date().toISOString().split('T')[0]}.json`;
-      
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.setAttribute('download', `lawyer_app_backup_${new Date().toISOString().split('T')[0]}.json`);
       linkElement.click();
       showToast('تم تصدير نسخة احتياطية بنجاح', 'success');
     } catch (error) {
@@ -2795,105 +2782,60 @@ const AdminDashboard = ({ onBack, showToast, requestConfirm }: { onBack: () => v
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const importedData = JSON.parse(e.target?.result as string);
-        if (!importedData.users || !Array.isArray(importedData.users)) {
-          throw new Error('تنسيق الملف غير صحيح');
-        }
-        
-        requestConfirm(
-          'تأكيد الاستيراد',
-          'سيتم استبدال جميع البيانات الحالية بالبيانات المستوردة. هل أنت متأكد؟',
-          () => {
-            saveLocalDB(importedData);
-            window.location.reload();
-          }
-        );
+        requestConfirm('تأكيد الاستيراد', 'سيتم استبدال كافة البيانات الحالية. هل أنت متأكد؟', async () => {
+          await updateData(importedData);
+          window.location.reload();
+        });
       } catch (error) {
-        showToast('خطأ: ملف غير صالح أو تالف', 'error');
+        showToast('خطأ: ملف غير صالح', 'error');
       }
     };
     reader.readAsText(file);
   };
 
-  const fetchData = async () => {
-    const res = await apiFetch('/api/admin/data');
-    const d = await res.json();
-    const db = getLocalDB();
-    setData({ ...d, geminiApiKey: db.geminiApiKey, supabaseUrl: db.supabaseUrl, supabaseKey: db.supabaseKey });
-    setGeminiKey(db.geminiApiKey || '');
-    setSupabaseUrl(db.supabaseUrl || '');
-    setSupabaseKey(db.supabaseKey || '');
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const approveUser = async (phone: string) => {
-    await apiFetch('/api/admin/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
-    });
+    const updatedUsers = data.users.map((u: any) => u.phone === phone ? { ...u, status: 'approved' } : u);
+    await updateData({ users: updatedUsers });
     showToast('تمت الموافقة على المستخدم', 'success');
-    fetchData();
   };
 
   const deleteUser = async (phone: string) => {
-    requestConfirm('حذف مستخدم', 'هل أنت متأكد من حذف هذا المستخدم نهائياً؟', async () => {
-      await apiFetch('/api/admin/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
-      });
+    requestConfirm('حذف مستخدم', 'هل أنت متأكد؟', async () => {
+      const updatedUsers = data.users.filter((u: any) => u.phone !== phone);
+      await updateData({ users: updatedUsers });
       showToast('تم حذف المستخدم', 'success');
-      fetchData();
     });
   };
 
   const updateUser = async (phone: string, updates: any) => {
-    const res = await apiFetch('/api/admin/update-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, updates })
-    });
-    if (res.ok) {
-      showToast('تم تحديث بيانات المستخدم', 'success');
-      setEditingUser(null);
-      fetchData();
-    } else {
-      const err = await res.json();
-      showToast(err.error, 'error');
-    }
+    const updatedUsers = data.users.map((u: any) => u.phone === phone ? { ...u, ...updates } : u);
+    await updateData({ users: updatedUsers });
+    showToast('تم تحديث بيانات المستخدم', 'success');
+    setEditingUser(null);
   };
 
   const handleReset = async (phone: string) => {
-    await apiFetch('/api/admin/handle-reset', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone })
-    });
+    const updatedResets = data.resetRequests.filter((r: any) => r.phone !== phone);
+    await updateData({ resetRequests: updatedResets });
     showToast('تم إغلاق طلب الاستعادة', 'success');
-    fetchData();
   };
 
   const sendNotification = async () => {
-    if (!notifyTitle || !notifyDesc) return showToast('يرجى إكمال بيانات الإشعار', 'error');
+    if (!notificationMessage) return showToast('يرجى كتابة رسالة', 'error');
     setIsSending(true);
     try {
-      await apiFetch('/api/admin/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: selectedUser, title: notifyTitle, desc: notifyDesc })
+      const notification = { id: Date.now().toString(), title: 'إشعار من الإدارة', desc: notificationMessage, timestamp: new Date().toISOString(), read: false };
+      const updatedUsers = data.users.map((u: any) => {
+        const userNotifs = u.notifications || [];
+        return { ...u, notifications: [notification, ...userNotifs] };
       });
-      showToast('تم إرسال الإشعار بنجاح', 'success');
-      setNotifyTitle('');
-      setNotifyDesc('');
-      setSelectedUser(null);
+      await updateData({ users: updatedUsers });
+      showToast('تم إرسال الإشعار للجميع بنجاح', 'success');
+      setNotificationMessage('');
     } catch (e) {
       showToast('خطأ في الإرسال', 'error');
     } finally {
@@ -2901,8 +2843,8 @@ const AdminDashboard = ({ onBack, showToast, requestConfirm }: { onBack: () => v
     }
   };
 
-  const pendingUsers = (data.users || []).filter(u => u.status === 'pending');
-  const filteredUsers = (data.users || []).filter(u => 
+  const pendingUsers = (data.users || []).filter((u:any) => u.status === 'pending');
+  const filteredUsers = (data.users || []).filter((u:any) => 
     u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     u.phone?.includes(searchQuery)
   );
@@ -2910,7 +2852,7 @@ const AdminDashboard = ({ onBack, showToast, requestConfirm }: { onBack: () => v
   const stats = {
     total: (data.users || []).length,
     pending: pendingUsers.length,
-    approved: (data.users || []).filter(u => u.status === 'approved').length,
+    approved: (data.users || []).filter((u:any) => u.status === 'approved').length,
     resets: (data.resetRequests || []).length
   };
 
@@ -3355,6 +3297,11 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // --- Centralized Data State ---
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return sessionStorage.getItem('isLoggedIn') === 'true';
   });
@@ -3367,8 +3314,24 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
   
-  const localDB = getLocalDB();
-  const hasCloudDB = !!localDB?.supabaseKey && (localDB.supabaseKey.startsWith('eyJ') || localDB.supabaseKey.startsWith('sb_publishable'));
+  // Load data from Supabase on mount
+  useEffect(() => {
+    const initApp = async () => {
+      setIsLoading(true);
+      try {
+        const cloudData = await loadFromSupabase();
+        setData(cloudData);
+      } catch (e) {
+        console.error("Initialization failed:", e);
+        setData(getLocalDB() || initializeDB());
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initApp();
+  }, []);
+
+  const hasCloudDB = !!data?.supabaseKey && (data.supabaseKey.startsWith('eyJ') || data.supabaseKey.startsWith('sb_publishable'));
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
@@ -3382,62 +3345,22 @@ export default function App() {
     }});
   };
 
-  // State for data
-  const [cases, setCases] = useState<Case[]>([
-    { id: '1', title: 'دعوى صحة توقيع', court: 'محكمة الفيوم الابتدائية', number: '1234/2025', status: 'قيد التداول', date: '2026-04-10' },
-    { id: '2', title: 'استئناف مدني', court: 'محكمة استئناف بني سويف', number: '567/2025', status: 'محجوزة للحكم', date: '2026-03-15' },
-  ]);
-
-  const [clients, setClients] = useState<Client[]>([
-    { id: '1', name: 'أحمد محمد علي', phone: '01012345678', type: 'client' },
-    { id: '2', name: 'شركة النيل للمقاولات', phone: '01298765432', type: 'client' },
-    { id: '3', name: 'محمود حسن إبراهيم', phone: '01155667788', type: 'opponent' },
-  ]);
-
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', title: 'سحب ملف القضية 1234', completed: false, date: '2026-03-10' },
-    { id: '2', title: 'سداد رسوم الاستئناف', completed: true, date: '2026-03-08' },
-    { id: '3', title: 'مقابلة موكل جديد', completed: false, date: '2026-03-12' },
-  ]);
-
-  const [sessions, setSessions] = useState<Session[]>([
-    { id: '1', caseTitle: 'دعوى صحة توقيع', court: 'مدني الفيوم', date: '2026-03-10', time: '09:00 ص' },
-    { id: '2', caseTitle: 'استئناف مدني', court: 'استئناف عالي', date: '2026-03-15', time: '10:30 ص' },
-  ]);
-
-  const [reminders, setReminders] = useState<Reminder[]>([
-    { id: '1', title: 'مراجعة ملف قضية أحمد محمد', time: '10:00' },
-    { id: '2', title: 'سداد اشتراك النقابة', time: '12:00' },
-  ]);
-
-  const [notifications, setNotifications] = useState<any[]>([]);
-
-  const fetchNotifications = async () => {
-    if (!isLoggedIn || !user) return;
-    try {
-      const res = await apiFetch(`/api/user/notifications?phone=${user.phone}`);
-      const data = await res.json();
-      if (res.ok) {
-        setNotifications(data.notifications);
-      }
-    } catch (e) {
-      console.error('Failed to fetch notifications');
-    }
+  // Helper to update and sync data
+  const updateData = async (updates: any) => {
+    const newData = { ...data, ...updates };
+    setData(newData);
+    saveLocalDB(newData);
+    await syncToSupabase(newData);
   };
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
-    return () => clearInterval(interval);
-  }, [isLoggedIn, user]);
-
-  const deleteNotification = async (id: string) => {
-    requestConfirm('حذف إشعار', 'هل أنت متأكد من حذف هذا الإشعار؟', async () => {
-      // For now we just filter locally, but ideally we'd have a delete endpoint
-      setNotifications(notifications.filter(n => n.id !== id));
-      showToast('تم حذف الإشعار', 'success');
-    });
-  };
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+        <p className="text-gray-500 font-bold">جاري مزامنة البيانات السحابية...</p>
+      </div>
+    );
+  }
 
   const handleLogin = (userData: any) => {
     setUser(userData);
@@ -3460,58 +3383,20 @@ export default function App() {
     showToast('تم تسجيل الخروج بنجاح', 'success');
   };
 
-  const addCase = (c: Omit<Case, 'id'>) => {
-    setCases([...cases, { ...c, id: Date.now().toString() }]);
-  };
+  // --- Wrapper Functions for Screens ---
+  const addCase = (c: any) => updateData({ cases: [...(data.cases || []), { ...c, id: Date.now().toString() }] });
+  const deleteCase = (id: string) => requestConfirm('حذف قضية', 'هل أنت متأكد؟', () => updateData({ cases: data.cases.filter((c: any) => c.id !== id) }));
+  
+  const addClient = (c: any) => updateData({ clients: [...(data.clients || []), { ...c, id: Date.now().toString() }] });
+  const deleteClient = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ clients: data.clients.filter((c: any) => c.id !== id) }));
 
-  const addClient = (c: Omit<Client, 'id'>) => {
-    setClients([...clients, { ...c, id: Date.now().toString() }]);
-  };
+  const addReminder = (r: any) => updateData({ reminders: [{ ...r, id: Date.now().toString() }, ...(data.reminders || [])] });
+  const deleteReminder = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ reminders: data.reminders.filter((r: any) => r.id !== id) }));
 
-  const addReminder = (r: Omit<Reminder, 'id'>) => {
-    setReminders([{ ...r, id: Date.now().toString() }, ...reminders]);
-  };
-
-  const deleteCase = (id: string) => {
-    requestConfirm('حذف قضية', 'هل أنت متأكد من حذف هذه القضية؟', () => {
-      setCases(cases.filter(c => c.id !== id));
-      showToast('تم حذف القضية بنجاح', 'success');
-    });
-  };
-
-  const deleteClient = (id: string) => {
-    const client = clients.find(c => c.id === id);
-    const typeText = client?.type === 'client' ? 'العميل' : 'الخصم';
-    requestConfirm(`حذف ${typeText}`, `هل أنت متأكد من حذف هذا ${typeText}؟`, () => {
-      setClients(clients.filter(c => c.id !== id));
-      showToast(`تم حذف ${typeText} بنجاح`, 'success');
-    });
-  };
-
-  const deleteTask = (id: string) => {
-    requestConfirm('حذف مهمة', 'هل أنت متأكد من حذف هذه المهمة؟', () => {
-      setTasks(tasks.filter(t => t.id !== id));
-      showToast('تم حذف المهمة بنجاح', 'success');
-    });
-  };
-
-  const deleteSession = (id: string) => {
-    requestConfirm('حذف جلسة', 'هل أنت متأكد من حذف هذه الجلسة؟', () => {
-      setSessions(sessions.filter(s => s.id !== id));
-      showToast('تم حذف الجلسة بنجاح', 'success');
-    });
-  };
-
-  const deleteReminder = (id: string) => {
-    requestConfirm('حذف تذكير', 'هل أنت متأكد من حذف هذا التذكير؟', () => {
-      setReminders(reminders.filter(r => r.id !== id));
-      showToast('تم حذف التذكير بنجاح', 'success');
-    });
-  };
-
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
+  const deleteSession = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ sessions: data.sessions.filter((s: any) => s.id !== id) }));
+  
+  const toggleTask = (id: string) => updateData({ tasks: data.tasks.map((t: any) => t.id === id ? { ...t, completed: !t.completed } : t) });
+  const deleteTask = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ tasks: data.tasks.filter((t: any) => t.id !== id) }));
 
   const isLandingPage = location.pathname === '/';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
@@ -3524,19 +3409,10 @@ export default function App() {
         </div>
       )}
       <div className="max-w-7xl mx-auto bg-white min-h-screen shadow-2xl relative flex flex-col">
-        <Sidebar 
-          isOpen={isSidebarOpen} 
-          onClose={() => setIsSidebarOpen(false)} 
-        />
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
         <AnimatePresence>
-          {toast && (
-            <Toast 
-              message={toast.message} 
-              type={toast.type} 
-              onClose={() => setToast(null)} 
-            />
-          )}
+          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </AnimatePresence>
 
         <ConfirmModal 
@@ -3548,31 +3424,33 @@ export default function App() {
         />
 
         <main className="flex-1">
-          <Routes location={location}>
+          <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginScreen onLogin={handleLogin} showToast={showToast} />} />
             <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/login')} showToast={showToast} />} />
             
-            {/* Protected Routes */}
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={notifications.length + reminders.length} /> : <Navigate to="/login" />} />
-            <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
+            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
+            <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
+            
             <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             
-            {/* Functional Screens */}
-            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={cases} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/login" />} />
-            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={clients} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/login" />} />
-            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={clients} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/login" />} />
-            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={sessions} onDelete={deleteSession} /> : <Navigate to="/login" />} />
-            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={tasks} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/login" />} />
-            <Route path="/bailiffs" element={isLoggedIn ? <BailiffsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
-            <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={notifications} reminders={reminders} onDelete={deleteNotification} /> : <Navigate to="/login" />} />
-            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={reminders} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/login" />} />
-            <Route path="/agenda" element={isLoggedIn ? <AgendaScreen onBack={() => navigate(-1)} sessions={sessions} tasks={tasks} /> : <Navigate to="/login" />} />
-            <Route path="/calendar" element={isLoggedIn ? <CalendarScreen onBack={() => navigate(-1)} sessions={sessions} /> : <Navigate to="/login" />} />
+            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/login" />} />
+            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/login" />} />
+            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/login" />} />
+            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data.sessions || []} onDelete={deleteSession} /> : <Navigate to="/login" />} />
+            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/login" />} />
+            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/login" />} />
+            
+            <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={data.users.find((u:any)=>u.phone===user?.phone)?.notifications || []} reminders={data.reminders || []} onDelete={async (id) => {
+              const updatedUsers = data.users.map((u: any) => u.phone === user.phone ? { ...u, notifications: u.notifications.filter((n: any) => n.id !== id) } : u);
+              await updateData({ users: updatedUsers });
+              showToast('تم حذف الإشعار', 'success');
+            }} /> : <Navigate to="/login" />} />
+            
             <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/login" />} />
             <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
