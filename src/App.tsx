@@ -417,54 +417,6 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen:
   </AnimatePresence>
 );
 
-const Footer = () => (
-  <footer className="bg-slate-900 text-white pt-16 pb-8 px-6">
-    <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Scale className="w-8 h-8 text-blue-500" />
-          <h3 className="text-xl font-bold">نقابة المحامين بالفيوم</h3>
-        </div>
-        <p className="text-slate-400 text-sm leading-relaxed">
-          المنصة الرقمية المتكاملة لخدمة السادة المحامين بمحافظة الفيوم، نسعى لتطوير العمل النقابي وتوفير كافة الأدوات الذكية لتسهيل ممارسة المهنة.
-        </p>
-      </div>
-      
-      <div>
-        <h4 className="font-bold mb-6 text-blue-400">روابط سريعة</h4>
-        <ul className="space-y-3 text-slate-400 text-sm">
-          <li><Link to="/home" className="hover:text-white transition-colors">الرئيسية</Link></li>
-          <li><Link to="/library" className="hover:text-white transition-colors">المكتبة القانونية</Link></li>
-          <li><Link to="/community" className="hover:text-white transition-colors">مجتمع المحامين</Link></li>
-          <li><Link to="/writing" className="hover:text-white transition-colors">المساعد الذكي</Link></li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-bold mb-6 text-blue-400">خدماتنا</h4>
-        <ul className="space-y-3 text-slate-400 text-sm">
-          <li>توزيع العمل القضائي</li>
-          <li>الإقرارات الضريبية</li>
-          <li>الجريدة الرسمية</li>
-          <li>المنصات الحكومية</li>
-        </ul>
-      </div>
-      
-      <div>
-        <h4 className="font-bold mb-6 text-blue-400">تواصل معنا</h4>
-        <ul className="space-y-3 text-slate-400 text-sm">
-          <li className="flex items-center gap-2"><Globe className="w-4 h-4" /> www.fayoum-lawyers.org</li>
-          <li className="flex items-center gap-2"><Users className="w-4 h-4" /> مقر النقابة - الفيوم</li>
-        </ul>
-      </div>
-    </div>
-    
-    <div className="max-w-7xl mx-auto pt-8 border-t border-slate-800 text-center text-slate-500 text-xs">
-      <p>جميع الحقوق محفوظة © {new Date().getFullYear()} نقابة المحامين بالفيوم - تصميم وتطوير المنصة الرقمية</p>
-    </div>
-  </footer>
-);
-
 const LandingPage = () => {
   const navigate = useNavigate();
   return (
@@ -564,8 +516,6 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 };
