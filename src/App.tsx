@@ -441,7 +441,7 @@ const LandingPage = () => {
           >
             <Scale className="w-20 h-20 text-blue-500 mx-auto mb-8" />
             <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-              مستقبل المحاماة <span className="text-blue-500">الرقمي</span> في الفيوم
+              المنصة الرقمية لنقابة المحامين بالفيوم <span className="text-blue-500">ترحب بك</span>
             </h1>
             <p className="text-xl text-slate-300 mb-10 leading-relaxed">
               المنصة الرسمية لنقابة المحامين بالفيوم - أدوات ذكية، مكتبة قانونية، ومجتمع متكامل في مكان واحد.
