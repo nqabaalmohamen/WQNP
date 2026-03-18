@@ -73,33 +73,48 @@ const useOnlineStatus = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const updateOnlineStatus = () => {
-      setIsOnline(navigator.onLine);
+    const checkRealStatus = async () => {
       if (!navigator.onLine) {
-        // إذا انقطع الإنترنت، قم بمسح البيانات الحساسة فوراً من الذاكرة والملفات المؤقتة
-        sessionStorage.removeItem('isLoggedIn');
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('lawyer_app_db');
-        window.location.reload(); 
+        handleOffline();
+        return;
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        await fetch('https://ayxmuvfbhleijlynsdbv.supabase.co/rest/v1/', { 
+          method: 'HEAD', 
+          mode: 'no-cors',
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+        setIsOnline(true);
+      } catch (e) {
+        handleOffline();
       }
     };
 
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
+    const handleOffline = () => {
+      setIsOnline(false);
+      // تنبيه فوري كما طلب المستخدم
+      alert("تنبيه: لقد انقطع الاتصال بالإنترنت. سيتم إغلاق الجلسة فوراً لحماية البيانات.");
+      
+      // مسح كافة البيانات الحساسة
+      sessionStorage.clear();
+      localStorage.clear();
+      window.location.reload(); 
+    };
 
-    // فحص دوري للتأكد من الحالة حتى لو لم يتم إطلاق الأحداث
-    const interval = setInterval(() => {
-      if (!navigator.onLine && isOnline) {
-        updateOnlineStatus();
-      }
-    }, 3000);
+    window.addEventListener('online', checkRealStatus);
+    window.addEventListener('offline', handleOffline);
+
+    const interval = setInterval(checkRealStatus, 10000);
 
     return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('online', checkRealStatus);
+      window.removeEventListener('offline', handleOffline);
       clearInterval(interval);
     };
-  }, [isOnline]);
+  }, []);
 
   return isOnline;
 };
@@ -108,25 +123,25 @@ const OfflineOverlay = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-6 text-center"
+    className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
   >
-    <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-8">
-      <Globe className="w-12 h-12 text-red-500 animate-pulse" />
+    <div className="w-32 h-32 bg-red-600/20 rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-600/10">
+      <XCircle className="w-16 h-16 text-red-500 animate-bounce" />
     </div>
-    <h1 className="text-3xl font-black text-white mb-4">لا يوجد اتصال بالإنترنت</h1>
-    <p className="text-slate-400 max-w-md leading-relaxed mb-8">
-      عذراً، هذا النظام يتطلب اتصالاً نشطاً بالإنترنت للعمل. يرجى التحقق من اتصالك والمحاولة مرة أخرى.
+    <h1 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">تنبيه: لا يوجد إنترنت</h1>
+    <p className="text-slate-400 max-w-lg leading-relaxed mb-10 text-xl">
+      عذراً، هذا النظام يعمل بنظام <span className="text-red-500 font-bold">الحماية السحابية المشددة</span>. لا يمكن تصفح أي بيانات أو الوصول لأي خدمة دون اتصال نشط بالإنترنت.
     </p>
-    <div className="flex flex-col gap-4 w-full max-w-xs">
+    <div className="flex flex-col gap-5 w-full max-w-sm">
       <button 
         onClick={() => window.location.reload()}
-        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-900/20 hover:bg-blue-700 transition-all cursor-pointer"
+        className="w-full py-5 bg-red-600 text-white rounded-3xl font-black text-xl shadow-2xl shadow-red-900/40 hover:bg-red-700 transition-all cursor-pointer transform hover:scale-105 active:scale-95"
       >
-        إعادة المحاولة
+        إعادة فحص الاتصال
       </button>
-      <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
-        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-        في انتظار الاتصال...
+      <div className="flex items-center justify-center gap-3 text-slate-500 font-bold">
+        <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
+        جاري مراقبة الشبكة...
       </div>
     </div>
   </motion.div>
@@ -396,6 +411,8 @@ const mockFetch = async (url: string, options: any = {}) => {
 
 const apiFetch = async (url: string, options: any = {}) => {
   if (!navigator.onLine) {
+    alert("تنبيه: لا يوجد اتصال بالإنترنت. لا يمكنك إجراء أي عمليات حالياً.");
+    window.location.reload();
     throw new Error('No internet connection');
   }
   if (isStaticHost) {
