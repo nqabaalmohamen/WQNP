@@ -51,11 +51,15 @@
             return true;
         }
 
-        // تنفيذ الفحص فوراً
+        // تنفيذ الفحص فوراً وبشكل دوري
         checkConnectivity();
+        setInterval(checkConnectivity, 2000);
 
         // إضافة مستمع لتغير الحالة
         window.addEventListener('offline', function() {
+            window.location.reload();
+        });
+        window.addEventListener('online', function() {
             window.location.reload();
         });
     </script>

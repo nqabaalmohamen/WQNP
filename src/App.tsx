@@ -73,17 +73,33 @@ const useOnlineStatus = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const updateOnlineStatus = () => {
+      setIsOnline(navigator.onLine);
+      if (!navigator.onLine) {
+        // إذا انقطع الإنترنت، قم بمسح البيانات الحساسة فوراً من الذاكرة والملفات المؤقتة
+        sessionStorage.removeItem('isLoggedIn');
+        sessionStorage.removeItem('user');
+        localStorage.removeItem('lawyer_app_db');
+        window.location.reload(); 
+      }
+    };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    // فحص دوري للتأكد من الحالة حتى لو لم يتم إطلاق الأحداث
+    const interval = setInterval(() => {
+      if (!navigator.onLine && isOnline) {
+        updateOnlineStatus();
+      }
+    }, 3000);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+      clearInterval(interval);
     };
-  }, []);
+  }, [isOnline]);
 
   return isOnline;
 };
@@ -175,10 +191,16 @@ const initializeDB = () => {
 };
 
 const saveLocalDB = (db: any) => {
+  // نقوم بمسح البيانات الحساسة إذا تم استدعاء الحفظ والإنترنت مقطوع
+  if (!navigator.onLine) {
+    localStorage.removeItem('lawyer_app_db');
+    return;
+  }
   localStorage.setItem('lawyer_app_db', JSON.stringify(db));
 };
 
 const getSupabase = (db: any) => {
+  if (!navigator.onLine) return null;
   if (db.supabaseUrl && db.supabaseKey) {
     return createClient(db.supabaseUrl, db.supabaseKey);
   }
@@ -188,6 +210,9 @@ const getSupabase = (db: any) => {
 const syncToSupabase = async (newDb: any) => {
   if (!navigator.onLine) {
     console.error('Cannot sync: No internet connection');
+    // مسح البيانات المحلية لضمان عدم وجود بيانات غير متزامنة
+    localStorage.removeItem('lawyer_app_db');
+    window.location.reload();
     return;
   }
   const supabase = getSupabase(newDb);
@@ -196,21 +221,29 @@ const syncToSupabase = async (newDb: any) => {
     const { error } = await supabase
       .from('app_data')
       .upsert({ id: 1, content: newDb });
-    if (error) console.error('Supabase Sync Error:', error);
+    if (error) {
+      console.error('Supabase Sync Error:', error);
+      // إذا فشل التحديث السحابي، لا نحتفظ بالبيانات المحلية لضمان النزاهة
+      localStorage.removeItem('lawyer_app_db');
+    }
   } catch (e) {
     console.error('Supabase Connection Error:', e);
   }
 };
 
 const loadFromSupabase = async () => {
-  const localDb = getLocalDB();
-  
   if (!navigator.onLine) {
+    localStorage.removeItem('lawyer_app_db');
     throw new Error('No internet connection');
   }
 
+  const localDb = getLocalDB();
   const supabase = getSupabase(localDb);
-  if (!supabase) return localDb;
+  
+  if (!supabase) {
+    // إذا لم توجد إعدادات سحابية، لا نقوم بتحميل أي شيء
+    throw new Error('Supabase configuration missing');
+  }
   
   try {
     const { data, error } = await supabase
@@ -220,6 +253,7 @@ const loadFromSupabase = async () => {
     
     if (error) {
       console.error('Supabase fetch error:', error.message);
+      localStorage.removeItem('lawyer_app_db'); // مسح المحلي عند الفشل
       throw error;
     }
 
@@ -230,12 +264,17 @@ const loadFromSupabase = async () => {
     }
   } catch (e) {
     console.error('Critical Supabase error:', e);
+    localStorage.removeItem('lawyer_app_db');
     throw e;
   }
   return localDb;
 };
 
 const mockFetch = async (url: string, options: any = {}) => {
+  if (!navigator.onLine) {
+    throw new Error('No internet connection');
+  }
+
   const body = options.body ? JSON.parse(options.body) : null;
   const createResponse = (ok: boolean, status: number, data: any) => ({
     ok,
@@ -356,6 +395,9 @@ const mockFetch = async (url: string, options: any = {}) => {
 };
 
 const apiFetch = async (url: string, options: any = {}) => {
+  if (!navigator.onLine) {
+    throw new Error('No internet connection');
+  }
   if (isStaticHost) {
     try {
       return await mockFetch(url, options);
@@ -3327,13 +3369,18 @@ export default function App() {
   // Load data from Supabase on mount
   useEffect(() => {
     const initApp = async () => {
+      if (!navigator.onLine) {
+        setIsLoading(false);
+        return; // OfflineOverlay will handle this
+      }
       setIsLoading(true);
       try {
         const cloudData = await loadFromSupabase();
         setData(cloudData);
       } catch (e) {
         console.error("Initialization failed:", e);
-        setData(getLocalDB() || initializeDB());
+        // لا نقوم بالتحميل من التخزين المحلي كبديل عند الفشل
+        setData(null);
       } finally {
         setIsLoading(false);
       }
@@ -3367,11 +3414,27 @@ export default function App() {
     return <OfflineOverlay />;
   }
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
         <p className="text-gray-500 font-bold">جاري مزامنة البيانات السحابية...</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <XCircle className="w-16 h-16 text-red-500 mb-4 mx-auto" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">فشل تحميل البيانات</h1>
+        <p className="text-gray-500 mb-6">لا يمكن تشغيل النظام بدون الوصول إلى البيانات السحابية.</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg"
+        >
+          إعادة المحاولة
+        </button>
       </div>
     );
   }
