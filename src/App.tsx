@@ -3382,7 +3382,7 @@ export default function App() {
             <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
             <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
+            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
             <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
@@ -3408,7 +3408,6 @@ export default function App() {
           </Routes>
         </main>
 
-        {!isLandingPage && !isAuthPage && <Footer />}
         {isLoggedIn && !isLandingPage && !isAuthPage && <BottomNav />}
       </div>
     </div>
