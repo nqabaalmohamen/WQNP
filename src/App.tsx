@@ -68,6 +68,54 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// --- Online Status Hook ---
+const useOnlineStatus = () => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+};
+
+const OfflineOverlay = () => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-6 text-center"
+  >
+    <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-8">
+      <Globe className="w-12 h-12 text-red-500 animate-pulse" />
+    </div>
+    <h1 className="text-3xl font-black text-white mb-4">لا يوجد اتصال بالإنترنت</h1>
+    <p className="text-slate-400 max-w-md leading-relaxed mb-8">
+      عذراً، هذا النظام يتطلب اتصالاً نشطاً بالإنترنت للعمل. يرجى التحقق من اتصالك والمحاولة مرة أخرى.
+    </p>
+    <div className="flex flex-col gap-4 w-full max-w-xs">
+      <button 
+        onClick={() => window.location.reload()}
+        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-900/20 hover:bg-blue-700 transition-all cursor-pointer"
+      >
+        إعادة المحاولة
+      </button>
+      <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+        في انتظار الاتصال...
+      </div>
+    </div>
+  </motion.div>
+);
+
 // --- Mock API for Static Hosting (GitHub Pages) ---
 const isStaticHost = true; // يتم تحويله لموقع ثابت (Static Mode) بالكامل بناءً على طلب المستخدم
 
@@ -138,6 +186,10 @@ const getSupabase = (db: any) => {
 };
 
 const syncToSupabase = async (newDb: any) => {
+  if (!navigator.onLine) {
+    console.error('Cannot sync: No internet connection');
+    return;
+  }
   const supabase = getSupabase(newDb);
   if (!supabase) return;
   try {
@@ -152,8 +204,14 @@ const syncToSupabase = async (newDb: any) => {
 
 const loadFromSupabase = async () => {
   const localDb = getLocalDB();
+  
+  if (!navigator.onLine) {
+    throw new Error('No internet connection');
+  }
+
   const supabase = getSupabase(localDb);
   if (!supabase) return localDb;
+  
   try {
     const { data, error } = await supabase
       .from('app_data')
@@ -161,8 +219,8 @@ const loadFromSupabase = async () => {
       .eq('id', 1);
     
     if (error) {
-      console.warn('Supabase fetch error:', error.message);
-      return localDb;
+      console.error('Supabase fetch error:', error.message);
+      throw error;
     }
 
     if (data && data.length > 0 && data[0].content) {
@@ -171,7 +229,8 @@ const loadFromSupabase = async () => {
       return cloudDb;
     }
   } catch (e) {
-    console.warn('Critical Supabase error, falling back to local storage.');
+    console.error('Critical Supabase error:', e);
+    throw e;
   }
   return localDb;
 };
@@ -3247,6 +3306,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isOnline = useOnlineStatus();
   
   // --- Centralized Data State ---
   const [data, setData] = useState<any>(null);
@@ -3302,6 +3362,10 @@ export default function App() {
     saveLocalDB(newData);
     await syncToSupabase(newData);
   };
+
+  if (!isOnline) {
+    return <OfflineOverlay />;
+  }
 
   if (isLoading || !data) {
     return (
