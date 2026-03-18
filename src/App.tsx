@@ -114,8 +114,8 @@ const getSupabase = () => {
 };
 
 const mockFetch = async (url: string, options: any = {}) => {
-  const db = getLocalDB();
   const supabase = getSupabase();
+  let db = await loadFromSupabase(); // Always load from cloud first
   const body = options.body ? JSON.parse(options.body) : null;
 
   const createResponse = (ok: boolean, status: number, data: any) => ({
