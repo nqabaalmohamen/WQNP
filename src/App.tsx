@@ -140,20 +140,20 @@ const mockFetch = async (url: string, options: any = {}) => {
   };
 
   const loadFromSupabase = async () => {
+    const supabase = getSupabase();
     if (!supabase) return db;
     try {
       const { data, error } = await supabase
         .from('app_data')
         .select('content')
-        .eq('id', 1); // Remove .single() to avoid throwing on 404/missing table
+        .eq('id', 1);
       
       if (error) {
-        console.warn('Supabase fetch error (likely table missing):', error.message);
+        console.warn('Supabase fetch error:', error.message);
         return db;
       }
 
       if (data && data.length > 0 && data[0].content) {
-        // Merge Supabase data with local data (Supabase wins)
         const merged = { ...db, ...data[0].content };
         saveLocalDB(merged);
         return merged;
@@ -165,7 +165,13 @@ const mockFetch = async (url: string, options: any = {}) => {
   };
 
   // For all requests, we try to load fresh from Supabase to ensure data consistency across devices
-  let currentDb = await loadFromSupabase();
+  let currentDb;
+  try {
+    currentDb = await loadFromSupabase();
+  } catch (e) {
+    console.error("Failed to load from Supabase:", e);
+    currentDb = db;
+  }
 
   if (url === '/api/auth/signup') {
     if (currentDb.users.find((u: any) => u.phone === body.phone)) {
@@ -276,7 +282,14 @@ const mockFetch = async (url: string, options: any = {}) => {
 };
 
 const apiFetch = async (url: string, options: any = {}) => {
-  if (isStaticHost) return mockFetch(url, options);
+  if (isStaticHost) {
+    try {
+      return await mockFetch(url, options);
+    } catch (e) {
+      console.error("Mock API Error:", e);
+      throw e;
+    }
+  }
   try {
     const response = await fetch(url, options);
     return response;
