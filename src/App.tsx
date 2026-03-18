@@ -74,15 +74,20 @@ const isStaticHost = true; // يتم تحويله لموقع ثابت (Static Mo
 const getLocalDB = () => {
   const data = localStorage.getItem('lawyer_app_db');
   if (data) {
-    const parsed = JSON.parse(data);
-    // Add a version check to invalidate old local storage structures
-    if (!parsed.version || parsed.version < 2) {
+    try {
+      const parsed = JSON.parse(data);
+      // Add a version check to invalidate old local storage structures
+      if (!parsed.version || parsed.version < 2) {
+        localStorage.removeItem('lawyer_app_db');
+        return initializeDB(); // Re-initialize
+      }
+      return parsed;
+    } catch (e) {
       localStorage.removeItem('lawyer_app_db');
-      return null; // Force re-initialization
+      return initializeDB();
     }
-    return parsed;
   }
-  return null; // No local data, initialize from scratch
+  return initializeDB(); // No local data, initialize from scratch
 };
 
 const initializeDB = () => {
@@ -3362,7 +3367,8 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void } | null>(null);
   
-  const hasCloudDB = !!getLocalDB().supabaseKey && (getLocalDB().supabaseKey.startsWith('eyJ') || getLocalDB().supabaseKey.startsWith('sb_publishable'));
+  const localDB = getLocalDB();
+  const hasCloudDB = !!localDB?.supabaseKey && (localDB.supabaseKey.startsWith('eyJ') || localDB.supabaseKey.startsWith('sb_publishable'));
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type });
