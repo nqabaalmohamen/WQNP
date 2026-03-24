@@ -155,7 +155,7 @@ const getLocalDB = () => {
   if (data) {
     try {
       const parsed = JSON.parse(data);
-      if (!parsed.version || parsed.version < 3) {
+      if (!parsed.version || parsed.version < 4) {
         localStorage.removeItem('lawyer_app_db');
         return initializeDB();
       }
@@ -170,7 +170,7 @@ const getLocalDB = () => {
 
 const initializeDB = () => {
   const initialDB = { 
-    version: 3,
+    version: 4,
     users: [
       { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin", notifications: [] }
     ], 
@@ -197,6 +197,8 @@ const initializeDB = () => {
       { id: '2', title: 'سداد اشتراك النقابة', time: '12:00' },
     ],
     resetRequests: [],
+    systemEvents: [], // سجل الأحداث المباشر
+    activeSessions: [], // جلسات المستخدمين النشطة
     geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
     supabaseKey: "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
@@ -1694,6 +1696,21 @@ const LibraryScreen = ({ onBack, requestConfirm }: { onBack: () => void, request
           </motion.div>
         )}
 
+        {activeTab === 'events' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <h3 className="text-lg font-bold text-slate-800">سجل أحداث النظام</h3>
+            <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3 max-h-[60vh] overflow-y-auto">
+              {[...(data.systemEvents || [])].reverse().map((event: any, index: number) => (
+                <div key={index} className="p-3 bg-slate-50 rounded-lg border-r-4 border-blue-500">
+                  <p className="text-sm font-bold text-slate-900">{event.type}</p>
+                  <p className="text-xs text-slate-600">{event.message}</p>
+                  <p className="text-[10px] text-slate-400">{new Date(event.timestamp).toLocaleString('ar-EG')}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {activeTab === 'settings' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
             <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
@@ -2806,7 +2823,7 @@ const SignupScreen = ({ onSignup, showToast }: { onSignup: () => void, showToast
 };
 
 const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }: { data: any, updateData: any, onBack: () => void, showToast: any, requestConfirm: any }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings' | 'events' | 'sessions' | 'stats' | 'data'>('pending');
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyDesc, setNotifyDesc] = useState('');
   const [selectedUser, setSelectedUser] = useState<string | null>(null); // null means all
@@ -2989,6 +3006,18 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
         <button onClick={() => setActiveTab('all')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'all' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
           كل المستخدمين
         </button>
+        <button onClick={() => setActiveTab('events')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'events' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+          سجل الأحداث
+        </button>
+        <button onClick={() => setActiveTab('sessions')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'sessions' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+          الجلسات النشطة
+        </button>
+        <button onClick={() => setActiveTab('stats')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'stats' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+          إحصائيات النظام
+        </button>
+        <button onClick={() => setActiveTab('data')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'data' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
+          مستعرض البيانات
+        </button>
         <button onClick={() => setActiveTab('notify')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'notify' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
           إرسال إشعارات
         </button>
@@ -3102,6 +3131,103 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
             <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
             <p>لا توجد طلبات استعادة</p>
           </div>
+        )}
+
+        {activeTab === 'sessions' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">الجلسات النشطة حالياً</h3>
+              <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
+                {(data.activeSessions || []).length} متصل
+              </span>
+            </div>
+            <div className="grid gap-3">
+              {(data.activeSessions || []).length > 0 ? (data.activeSessions || []).map((session: any, index: number) => (
+                <div key={index} className="bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center border border-green-200">
+                      <User className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{session.userName}</p>
+                      <p className="text-xs text-slate-500">الهاتف: {session.phone}</p>
+                      <p className="text-[10px] text-slate-400">وقت الدخول: {new Date(session.loginTime).toLocaleString('ar-EG')}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      requestConfirm('تسجيل خروج إجباري', `هل أنت متأكد من طرد المستخدم ${session.userName}؟`, async () => {
+                        const updatedSessions = data.activeSessions.filter((s: any) => s.phone !== session.phone);
+                        await updateData({ activeSessions: updatedSessions });
+                        showToast('تم طرد المستخدم بنجاح', 'success');
+                      });
+                    }}
+                    className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors flex items-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" /> طرد
+                  </button>
+                </div>
+              )) : (
+                <div className="text-center py-12 text-slate-400 bg-white rounded-xl border">
+                  <UserX className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>لا يوجد مستخدمين متصلين حالياً</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'stats' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            <h3 className="text-lg font-bold text-slate-800">إحصائيات النظام التفصيلية</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-2">
+                <div className="flex items-center gap-3 text-blue-600">
+                  <Briefcase className="w-5 h-5" />
+                  <span className="font-bold">القضايا</span>
+                </div>
+                <p className="text-3xl font-black text-slate-900">{(data.cases || []).length}</p>
+                <p className="text-xs text-slate-500">إجمالي القضايا المسجلة</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-2">
+                <div className="flex items-center gap-3 text-emerald-600">
+                  <Users className="w-5 h-5" />
+                  <span className="font-bold">الموكلين</span>
+                </div>
+                <p className="text-3xl font-black text-slate-900">{(data.clients || []).length}</p>
+                <p className="text-xs text-slate-500">إجمالي الموكلين والخصوم</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-2">
+                <div className="flex items-center gap-3 text-purple-600">
+                  <CalendarIcon className="w-5 h-5" />
+                  <span className="font-bold">الجلسات</span>
+                </div>
+                <p className="text-3xl font-black text-slate-900">{(data.sessions || []).length}</p>
+                <p className="text-xs text-slate-500">إجمالي الجلسات المجدولة</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'data' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">مستعرض البيانات الخام</h3>
+              <button 
+                onClick={() => {
+                  const dataStr = JSON.stringify(data, null, 2);
+                  navigator.clipboard.writeText(dataStr);
+                  showToast('تم نسخ قاعدة البيانات كاملة إلى الحافظة', 'success');
+                }}
+                className="text-blue-600 text-xs font-bold hover:underline"
+              >
+                نسخ الكل كـ JSON
+              </button>
+            </div>
+            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 font-mono text-xs text-emerald-500 overflow-x-auto max-h-[60vh] overflow-y-auto ltr whitespace-pre">
+              {JSON.stringify(data, null, 2)}
+            </div>
+          </motion.div>
         )}
 
         {activeTab === 'all' && (
@@ -3447,6 +3573,20 @@ export default function App() {
     await syncToSupabase(newData);
   };
 
+  const logEvent = async (type: string, message: string, severity: 'normal' | 'warning' | 'critical' = 'normal') => {
+    const event = {
+      id: Date.now().toString(),
+      type,
+      message,
+      severity,
+      timestamp: new Date().toISOString(),
+      userName: user?.name || 'غير معروف',
+      userPhone: user?.phone || 'غير معروف'
+    };
+    const updatedEvents = [event, ...(data.systemEvents || [])].slice(0, 100); // Keep last 100 events
+    await updateData({ systemEvents: updatedEvents });
+  };
+
   if (!isOnline) {
     return <OfflineOverlay />;
   }
@@ -3476,11 +3616,38 @@ export default function App() {
     );
   }
 
-  const handleLogin = (userData: any) => {
+  const handleLogin = async (userData: any) => {
     setUser(userData);
     setIsLoggedIn(true);
     sessionStorage.setItem('isLoggedIn', 'true');
     sessionStorage.setItem('user', JSON.stringify(userData));
+
+    // تحديث الجلسات النشطة
+    const session = {
+      phone: userData.phone,
+      userName: userData.name,
+      loginTime: new Date().toISOString(),
+      lastActive: new Date().toISOString()
+    };
+    const otherSessions = (data.activeSessions || []).filter((s: any) => s.phone !== userData.phone);
+    const updatedSessions = [session, ...otherSessions];
+    
+    // تسجيل الحدث وتحديث الجلسات
+    const event = {
+      id: Date.now().toString(),
+      type: 'دخول',
+      message: `قام المستخدم ${userData.name} بتسجيل الدخول`,
+      severity: 'normal',
+      timestamp: new Date().toISOString(),
+      userName: userData.name,
+      userPhone: userData.phone
+    };
+    
+    await updateData({ 
+      activeSessions: updatedSessions,
+      systemEvents: [event, ...(data.systemEvents || [])].slice(0, 100)
+    });
+
     if (userData.role === 'admin') {
       navigate('/admin');
     } else {
@@ -3488,7 +3655,24 @@ export default function App() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (user) {
+      const updatedSessions = (data.activeSessions || []).filter((s: any) => s.phone !== user.phone);
+      const event = {
+        id: Date.now().toString(),
+        type: 'خروج',
+        message: `قام المستخدم ${user.name} بتسجيل الخروج`,
+        severity: 'normal',
+        timestamp: new Date().toISOString(),
+        userName: user.name,
+        userPhone: user.phone
+      };
+      await updateData({ 
+        activeSessions: updatedSessions,
+        systemEvents: [event, ...(data.systemEvents || [])].slice(0, 100)
+      });
+    }
+
     setIsLoggedIn(false);
     setUser(null);
     sessionStorage.removeItem('isLoggedIn');
@@ -3498,19 +3682,52 @@ export default function App() {
   };
 
   // --- Wrapper Functions for Screens ---
-  const addCase = (c: any) => updateData({ cases: [...(data.cases || []), { ...c, id: Date.now().toString() }] });
-  const deleteCase = (id: string) => requestConfirm('حذف قضية', 'هل أنت متأكد؟', () => updateData({ cases: data.cases.filter((c: any) => c.id !== id) }));
+  const addCase = async (c: any) => {
+    await updateData({ cases: [...(data.cases || []), { ...c, id: Date.now().toString() }] });
+    logEvent('إضافة قضية', `تم إضافة قضية جديدة: ${c.title}`);
+  };
+  const deleteCase = (id: string) => requestConfirm('حذف قضية', 'هل أنت متأكد؟', async () => {
+    const c = data.cases.find((x: any) => x.id === id);
+    await updateData({ cases: data.cases.filter((c: any) => c.id !== id) });
+    logEvent('حذف قضية', `تم حذف قضية: ${c?.title || id}`, 'warning');
+  });
   
-  const addClient = (c: any) => updateData({ clients: [...(data.clients || []), { ...c, id: Date.now().toString() }] });
-  const deleteClient = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ clients: data.clients.filter((c: any) => c.id !== id) }));
+  const addClient = async (c: any) => {
+    await updateData({ clients: [...(data.clients || []), { ...c, id: Date.now().toString() }] });
+    logEvent('إضافة موكل', `تم إضافة موكل جديد: ${c.name}`);
+  };
+  const deleteClient = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', async () => {
+    const c = data.clients.find((x: any) => x.id === id);
+    await updateData({ clients: data.clients.filter((c: any) => c.id !== id) });
+    logEvent('حذف موكل', `تم حذف موكل: ${c?.name || id}`, 'warning');
+  });
 
-  const addReminder = (r: any) => updateData({ reminders: [{ ...r, id: Date.now().toString() }, ...(data.reminders || [])] });
-  const deleteReminder = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ reminders: data.reminders.filter((r: any) => r.id !== id) }));
+  const addReminder = async (r: any) => {
+    await updateData({ reminders: [{ ...r, id: Date.now().toString() }, ...(data.reminders || [])] });
+    logEvent('إضافة تذكير', `تم إضافة تذكير: ${r.title}`);
+  };
+  const deleteReminder = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', async () => {
+    const r = data.reminders.find((x: any) => x.id === id);
+    await updateData({ reminders: data.reminders.filter((r: any) => r.id !== id) });
+    logEvent('حذف تذكير', `تم حذف تذكير: ${r?.title || id}`, 'normal');
+  });
 
-  const deleteSession = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ sessions: data.sessions.filter((s: any) => s.id !== id) }));
+  const deleteSession = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', async () => {
+    const s = data.sessions.find((x: any) => x.id === id);
+    await updateData({ sessions: data.sessions.filter((s: any) => s.id !== id) });
+    logEvent('حذف جلسة', `تم حذف جلسة: ${s?.caseTitle || id}`, 'normal');
+  });
   
-  const toggleTask = (id: string) => updateData({ tasks: data.tasks.map((t: any) => t.id === id ? { ...t, completed: !t.completed } : t) });
-  const deleteTask = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', () => updateData({ tasks: data.tasks.filter((t: any) => t.id !== id) }));
+  const toggleTask = async (id: string) => {
+    const t = data.tasks.find((x: any) => x.id === id);
+    await updateData({ tasks: data.tasks.map((t: any) => t.id === id ? { ...t, completed: !t.completed } : t) });
+    logEvent('تحديث مهمة', `تم تغيير حالة المهمة: ${t?.title || id}`);
+  };
+  const deleteTask = (id: string) => requestConfirm('حذف', 'هل أنت متأكد؟', async () => {
+    const t = data.tasks.find((x: any) => x.id === id);
+    await updateData({ tasks: data.tasks.filter((t: any) => t.id !== id) });
+    logEvent('حذف مهمة', `تم حذف مهمة: ${t?.title || id}`, 'normal');
+  });
 
   const isLandingPage = location.pathname === '/';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
