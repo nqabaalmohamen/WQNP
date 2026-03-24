@@ -278,6 +278,10 @@ const loadFromSupabase = async () => {
       const cloudDb = data[0].content;
       saveLocalDB(cloudDb);
       return cloudDb;
+    } else {
+      // إذا كانت السحابة فارغة، نقوم برفع البيانات المحلية الحالية كنسخة أولية
+      await syncToSupabase(localDb);
+      return localDb;
     }
   } catch (e) {
     console.error('Critical Supabase error:', e);
