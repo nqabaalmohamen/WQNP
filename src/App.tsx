@@ -3525,8 +3525,14 @@ export default function App() {
     return sessionStorage.getItem('isLoggedIn') === 'true';
   });
   const [user, setUser] = useState<any>(() => {
-    const savedUser = sessionStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = sessionStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (error) {
+      console.error("Failed to parse user data from sessionStorage", error);
+      sessionStorage.removeItem('user'); // Clear corrupted data
+      return null;
+    }
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
