@@ -1704,7 +1704,7 @@ const LibraryScreen = ({ onBack, requestConfirm }: { onBack: () => void, request
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <h3 className="text-lg font-bold text-slate-800">سجل أحداث النظام</h3>
             <div className="bg-white p-4 rounded-xl border shadow-sm space-y-3 max-h-[60vh] overflow-y-auto">
-              {[...((db && db.systemEvents) || [])].reverse().map((event: any, index: number) => (
+              {[...((data && data.systemEvents) || [])].reverse().map((event: any, index: number) => (
                 <div key={index} className="p-3 bg-slate-50 rounded-lg border-r-4 border-blue-500">
                   <p className="text-sm font-bold text-slate-900">{event.type}</p>
                   <p className="text-xs text-slate-600">{event.message}</p>
