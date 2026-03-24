@@ -7,7 +7,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/WQNP/',
+    base: './',
     plugins: [
       react(), 
       tailwindcss(), 
