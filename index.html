@@ -6,6 +6,9 @@
     <title>نقابة المحامين بالفيوم</title>
     <script>
         // فحص حقيقي للاتصال بالإنترنت عبر محاولة الوصول لخدمة سحابية
+        let failedAttempts = 0;
+        const MAX_FAILED_ATTEMPTS = 3; // السماح بـ 3 محاولات فاشلة قبل إظهار الشاشة لتجنب الأخطاء المؤقتة
+
         async function checkRealConnectivity() {
             if (!navigator.onLine) {
                 showOfflineScreen();
@@ -22,10 +25,15 @@
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
+                failedAttempts = 0; // إعادة تعيين العداد عند النجاح
                 return true;
             } catch (e) {
-                showOfflineScreen();
-                return false;
+                failedAttempts++;
+                if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+                    showOfflineScreen();
+                    return false;
+                }
+                return true; // السماح بالاستمرار مؤقتاً
             }
         }
 
@@ -83,16 +91,18 @@
         // فحص أولي
         checkRealConnectivity();
 
-        // فحص دوري كل 5 ثواني للتأكد من استمرار الإنترنت
-        setInterval(checkRealConnectivity, 5000);
+        // فحص دوري كل 10 ثواني للتأكد من استمرار الإنترنت (تم زيادة المدة لتقليل الضغط)
+        setInterval(checkRealConnectivity, 10000);
 
         // مراقبة أحداث المتصفح
         window.addEventListener('offline', () => {
             window.isAlerted = false;
+            failedAttempts = MAX_FAILED_ATTEMPTS; // إجبار إظهار الشاشة فوراً عند انقطاع الشبكة
             checkRealConnectivity();
         });
         window.addEventListener('online', () => {
             window.isAlerted = false;
+            failedAttempts = 0;
             window.location.reload();
         });
     </script>
