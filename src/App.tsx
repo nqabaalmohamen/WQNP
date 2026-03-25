@@ -962,7 +962,7 @@ const PlaceholderScreen = ({ title, onBack, description }: { title: string, onBa
 
 // --- Screens ---
 
-const HomeScreen = ({ onMenu, showToast, notificationsCount = 0 }: { onMenu: () => void, showToast: (m: string, t?: any) => void, notificationsCount?: number }) => {
+const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, notificationsCount?: number }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -1020,11 +1020,7 @@ const HomeScreen = ({ onMenu, showToast, notificationsCount = 0 }: { onMenu: () 
                   <button
                     key={service.id}
                     onClick={() => {
-                      if (service.id === '/writing') {
-                        showToast('هذه الخدمة ستكون متاحة قريباً جداً لخدمة السادة المحامين بالفيوم', 'info');
-                      } else {
-                        navigate(service.id);
-                      }
+                      navigate(service.id);
                       setSearchQuery('');
                     }}
                     className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none text-right"
@@ -1136,7 +1132,7 @@ const HomeScreen = ({ onMenu, showToast, notificationsCount = 0 }: { onMenu: () 
 
 };
 
-const MyOfficeScreen = ({ onBack, showToast, cases, clients, tasks, sessions, reminders }: { onBack: () => void, showToast: (m: string, t?: any) => void, cases: Case[], clients: Client[], tasks: Task[], sessions: Session[], reminders: Reminder[] }) => {
+const MyOfficeScreen = ({ onBack, cases, clients, tasks, sessions, reminders }: { onBack: () => void, cases: Case[], clients: Client[], tasks: Task[], sessions: Session[], reminders: Reminder[] }) => {
   const navigate = useNavigate();
   return (
     <div className="pb-24">
@@ -1168,7 +1164,7 @@ const MyOfficeScreen = ({ onBack, showToast, cases, clients, tasks, sessions, re
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ActionCard icon={ShieldCheck} title="الأعمال الإدارية" subtitle={`${tasks.filter(t=>!t.completed).length} مهام قائمة`} color="bg-green-600" onClick={() => navigate('/tasks')} />
             <ActionCard icon={FileText} title="المحضرين" subtitle="إدارة المحضرين والإجراءات" color="bg-green-500" onClick={() => navigate('/bailiffs')} />
-            <ActionCard icon={PenTool} title="الأعمال الكتابية" subtitle="كتابة العرائض والمذكرات" color="bg-green-400" onClick={() => showToast('هذه الخدمة ستكون متاحة قريباً جداً لخدمة السادة المحامين بالفيوم', 'info')} />
+            <ActionCard icon={PenTool} title="الأعمال الكتابية" subtitle="كتابة العرائض والمذكرات" color="bg-green-400" onClick={() => navigate('/writing')} />
           </div>
         </div>
       </div>
@@ -3858,10 +3854,10 @@ export default function App() {
             <Route path="/login" element={<LoginScreen onLogin={handleLogin} showToast={showToast} />} />
             <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/login')} showToast={showToast} />} />
             
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
+            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
             <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
+            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
             <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
