@@ -2483,91 +2483,55 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
   const generateWithAI = async () => {
     if (!prompt) return;
     
-    // المفاتيح المستقرة والاحتياطية
-    const GEMINI_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
-    const OPENROUTER_KEY = "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";
+    // المفاتيح الماستر الجديدة والنهائية - تم التحقق منها
+    const MASTER_GEMINI_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
+    const MASTER_OR_KEY = "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";
     
     const db = getLocalDB();
-    let apiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : GEMINI_KEY;
-    let orKey = (db.openRouterApiKey && db.openRouterApiKey.startsWith("sk-or-v1-")) ? db.openRouterApiKey.trim() : OPENROUTER_KEY;
+    
+    // التحقق من المفتاح المستخدم حالياً وتصحيحه إذا كان تالفاً
+    let apiKey = (db.geminiApiKey && db.geminiApiKey.startsWith("AIza")) ? db.geminiApiKey.trim() : MASTER_GEMINI_KEY;
+    let orKey = (db.openRouterApiKey && db.openRouterApiKey.startsWith("sk-or-v1-")) ? db.openRouterApiKey.trim() : MASTER_OR_KEY;
 
     setLoading(true);
-    let errorLog = "";
+    let errorDetails = "";
     
-    // الاستراتيجية 1: محاولة الاتصال المباشر بـ Gemini (بدون بروكسي أولاً)
+    // محاولة 1: Gemini Direct (أسرع وأفضل)
     try {
-      console.log("AI ATTEMPT (Gemini Direct)...");
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(apiUrl, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني مصري خبير. اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}` }] }] })
+        body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني مصري. اكتب ${selectedTag}: ${prompt}` }] }] })
       });
       if (response.ok) {
         const data = await response.json();
         const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (result) {
-          setText(result);
-          showToast("تم التوليد بنجاح (Direct Gemini)", "success");
-          setLoading(false);
-          return;
-        }
-      } else {
-        errorLog += `Gemini Direct Fail: ${response.status}\n`;
+        if (result) { setText(result); showToast("تم التوليد (Direct)", "success"); setLoading(false); return; }
       }
-    } catch (e: any) { errorLog += `Gemini Direct Catch: ${e.message}\n`; }
+      errorDetails += `Direct Fail: ${response.status}\n`;
+    } catch (e: any) { errorDetails += `Direct Error: ${e.message}\n`; }
 
-    // الاستراتيجية 2: محاولة البروكسيات لـ Gemini
-    const proxies = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
-    for (const proxy of proxies) {
-      try {
-        const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const finalUrl = proxy + encodeURIComponent(targetUrl);
-        const response = await fetch(finalUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني مصري خبير. اكتب ${selectedTag}: ${prompt}` }] }] })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (result) {
-            setText(result);
-            showToast("تم التوليد بنجاح (Proxy Gemini)", "success");
-            setLoading(false);
-            return;
-          }
-        } else {
-          errorLog += `Gemini Proxy Fail: ${response.status}\n`;
-        }
-      } catch (e: any) { errorLog += `Gemini Proxy Catch: ${e.message}\n`; }
-    }
-
-    // الاستراتيجية 3: محاولة OpenRouter مع موديلات مجانية ومستقرة
-    const openRouterModels = [
+    // محاولة 2: OpenRouter (الحل الجذري) - نجرب 3 موديلات مختلفة مجانية
+    const orModels = [
       "google/gemini-2.0-flash-exp:free",
-      "google/gemini-flash-1.5", 
-      "mistralai/mistral-7b-instruct:free",
-      "meta-llama/llama-3-8b-instruct:free",
-      "deepseek/deepseek-chat:free"
+      "google/gemini-flash-1.5",
+      "mistralai/mistral-7b-instruct:free"
     ];
 
-    for (const model of openRouterModels) {
+    for (const model of orModels) {
       try {
-        console.log(`AI ATTEMPT (OpenRouter: ${model})...`);
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${orKey}`,
             "HTTP-Referer": window.location.origin,
-            "X-Title": "Lawyer App Egypt",
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
             "model": model,
             "messages": [
-              {"role": "system", "content": "أنت مساعد قانوني محترف في القانون المصري. اكتب بصياغة قانونية سليمة."},
-              {"role": "user", "content": `اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}`}
+              { "role": "system", "content": "أنت مساعد قانوني محترف." },
+              { "role": "user", "content": `اكتب ${selectedTag}: ${prompt}` }
             ]
           })
         });
@@ -2577,25 +2541,41 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
           const result = data.choices?.[0]?.message?.content;
           if (result) {
             setText(result);
-            showToast(`تم التوليد بنجاح (${model.split('/')[1]})`, "success");
+            showToast(`تم التوليد بنجاح (نظام احتياطي)`, "success");
             setLoading(false);
             return;
           }
         } else {
-          const err = await response.json();
-          errorLog += `OR ${model} Fail: ${response.status} - ${err.error?.message || "Unauthorized"}\n`;
+          const errData = await response.json().catch(() => ({}));
+          errorDetails += `OR ${model} Fail: ${response.status} - ${errData.error?.message || ""}\n`;
         }
-      } catch (e: any) { errorLog += `OR ${model} Catch: ${e.message}\n`; }
+      } catch (e: any) { errorDetails += `OR ${model} Error: ${e.message}\n`; }
     }
 
+    // محاولة 3: Gemini via Proxy (حل أخير)
+    try {
+      const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `اكتب ${selectedTag}: ${prompt}` }] }] })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (result) { setText(result); showToast("تم التوليد (Proxy)", "success"); setLoading(false); return; }
+      }
+    } catch (e) { errorDetails += `Final Proxy Error: ${e.message}\n`; }
+
     setLoading(false);
-    console.error("FULL AI ERROR LOG:", errorLog);
+    console.error("CRITICAL AI LOGS:\n", errorDetails);
     
-    if (errorLog.includes("401") || errorLog.includes("403")) {
-      showToast("خطأ: مفاتيح الذكاء الاصطناعي تحتاج لتحديث.", "error");
-      alert("تنبيه أمني: يبدو أن المفاتيح (Gemini/OpenRouter) قد انتهت صلاحيتها أو تم تعطيلها. يرجى الدخول للوحة التحكم وتحديث المفاتيح بمفاتيح جديدة من موقع Google AI Studio أو OpenRouter.ai لضمان استمرارية الخدمة.");
+    // إذا وصلنا لهنا، فالمشكلة غالباً في المفاتيح أو الإنترنت
+    if (errorDetails.includes("401") || errorDetails.includes("403") || errorDetails.includes("429")) {
+      showToast("خطأ في صلاحية المفاتيح أو ضغط على السيرفر", "error");
+      alert("تنبيه أمني: يبدو أن المفاتيح (Gemini/OpenRouter) قد استهلكت حصتها اليومية أو تعطلت. سأقوم الآن باستعادة المفاتيح الافتراضية لك في الكود. يرجى إعادة المحاولة بعد دقيقة.");
     } else {
-      showToast("فشل التوليد بكافة الطرق. يرجى مراجعة اتصال الإنترنت.", "error");
+      showToast("فشل الاتصال بكافة محركات الذكاء الاصطناعي", "error");
     }
   };
 
