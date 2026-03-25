@@ -2489,7 +2489,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     
     const db = getLocalDB();
     let apiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : GEMINI_KEY;
-    let orKey = (db.openRouterApiKey) ? db.openRouterApiKey.trim() : OPENROUTER_KEY;
+    let orKey = (db.openRouterApiKey && db.openRouterApiKey.startsWith("sk-or-v1-")) ? db.openRouterApiKey.trim() : OPENROUTER_KEY;
 
     setLoading(true);
     let errorLog = "";
@@ -3180,6 +3180,17 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
                   <input type="password" value={openRouterKey} onChange={e => setOpenRouterKey(e.target.value)} placeholder="أدخل OpenRouter API Key هنا..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
                   <button onClick={saveOpenRouterKey} className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-slate-900 transition-colors text-xs">حفظ</button>
                 </div>
+                <button 
+                  onClick={() => {
+                    const defaultOR = "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";
+                    setOpenRouterKey(defaultOR);
+                    updateData({ openRouterApiKey: defaultOR });
+                    showToast('تم استعادة مفتاح OpenRouter الافتراضي', 'success');
+                  }}
+                  className="text-slate-500 text-[10px] font-bold hover:underline"
+                >
+                  استعادة مفتاح OpenRouter الافتراضي
+                </button>
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
