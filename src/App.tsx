@@ -2488,29 +2488,17 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
     setLoading(true);
     try {
-      // المحاولة الأولى: تمرير المفتاح مباشرة كسلسلة نصية
-  const genAI: any = new GoogleGenAI(apiKey);
-  const model: any = genAI.getGenerativeModel ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : genAI;
+      // الطريقة الصحيحة لتمرير المفتاح لمكتبة GoogleGenAI في المتصفح
+      const genAI = new GoogleGenAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       const result = await model.generateContent(`أنت مساعد قانوني خبير. اكتب ${selectedTag} بناءً على: ${prompt}`);
       const response = await result.response;
       setText(response.text());
       showToast("تم توليد النص بنجاح", "success");
     } catch (error: any) {
-      console.error("AI First Attempt Error:", error);
-      
-      try {
-        // المحاولة الثانية: تمرير المفتاح داخل كائن (Object) - هذا يحل مشكلة بعض المتصفحات
-  const genAI2: any = new GoogleGenAI(apiKey);
-  const model2: any = genAI2.getGenerativeModel ? genAI2.getGenerativeModel({ model: "gemini-1.5-flash" }) : genAI2;
-  const result2 = await model2.generateContent(prompt);
-        const response2 = await result2.response;
-        setText(response2.text());
-        showToast("تم توليد النص بنجاح", "success");
-      } catch (error2: any) {
-        console.error("AI Second Attempt Error:", error2);
-        showToast("فشل الذكاء الاصطناعي: " + (error2.message || "تأكد من اتصال الإنترنت"), "error");
-      }
+      console.error("AI Generation Error:", error);
+      showToast("فشل الذكاء الاصطناعي: " + (error.message || "تأكد من اتصال الإنترنت وصلاحية المفتاح"), "error");
     } finally {
       setLoading(false);
     }
