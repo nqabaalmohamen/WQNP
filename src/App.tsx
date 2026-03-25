@@ -538,6 +538,14 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen:
 );
 
 const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
+  useEffect(() => {
+    // نستخدم setTimeout لضمان انتهاء الدخلة مهما حدث في الأنيميشن
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 4500); // 4.5 ثوانٍ كافية لكل الحركات
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
   return (
     <motion.div 
       initial={{ opacity: 1 }}
@@ -611,13 +619,6 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
           المنصة الرقمية الذكية
         </p>
       </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 4 }}
-        onAnimationComplete={() => setTimeout(onComplete, 500)}
-      />
     </motion.div>
   );
 };
