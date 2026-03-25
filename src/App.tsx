@@ -2484,15 +2484,14 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     
     // المفاتيح المستقرة والاحتياطية
     const GEMINI_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
-    // هذا مفتاح OpenRouter احتياطي (بديل لجوجل) لا يفرض قيوداً جغرافية
-    const OPENROUTER_KEY = "sk-or-v1-53696700078044737220268504284138622111536214041724211142211242142111"; // ملاحظة: هذا مثال لمفتاح، سيتم استخدامه كبروكسي
+    const OPENROUTER_KEY = "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";
     
     const db = getLocalDB();
     let apiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : GEMINI_KEY;
 
     setLoading(true);
     
-    // الاستراتيجية 1: محاولة الاتصال المباشر والمحمي (Proxies)
+    // الاستراتيجية 1: محاولة الاتصال المباشر والمحمي (Proxies) لـ Gemini
     const proxies = [
       "https://corsproxy.io/?",
       "https://api.allorigins.win/raw?url=",
@@ -2501,6 +2500,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     
     for (const proxy of proxies) {
       try {
+        console.log(`AI ATTEMPT (Gemini via Proxy: ${proxy.substring(0, 15)})...`);
         const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const finalUrl = proxy + encodeURIComponent(targetUrl);
         
@@ -2517,7 +2517,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
           const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (result) {
             setText(result);
-            showToast("تم التوليد بنجاح (نظام الوصول الذكي)", "success");
+            showToast("تم التوليد بنجاح (Gemini Proxy)", "success");
             setLoading(false);
             return;
           }
@@ -2525,43 +2525,52 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
       } catch (e) { continue; }
     }
 
-    // الاستراتيجية 2: الحل الجذري والنهائي (OpenRouter) - يتجاوز حظر جوجل الجغرافي تماماً
-    try {
-      console.log("AI SYSTEM: TRIGGERING RADICAL FALLBACK (OpenRouter)...");
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer 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`, // مفتاح OpenRouter احتياطي جديد ومستقر
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Lawyer App Egypt",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "model": "google/gemini-flash-1.5",
-          "messages": [
-            {"role": "system", "content": "أنت مساعد قانوني محترف في القانون المصري. اكتب بصياغة قانونية سليمة."},
-            {"role": "user", "content": `اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}`}
-          ]
-        })
-      });
+    // الاستراتيجية 2: محاولة OpenRouter مع عدة موديلات لضمان العمل 100%
+    const openRouterModels = [
+      "google/gemini-flash-1.5", 
+      "mistralai/mistral-7b-instruct", 
+      "meta-llama/llama-3-8b-instruct"
+    ];
 
-      if (response.ok) {
-        const data = await response.json();
-        const result = data.choices?.[0]?.message?.content;
-        if (result) {
-          setText(result);
-          showToast("تم التوليد بنجاح (نظام المزامنة العالمي)", "success");
-          setLoading(false);
-          return;
+    for (const model of openRouterModels) {
+      try {
+        console.log(`AI ATTEMPT (OpenRouter Model: ${model})...`);
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${OPENROUTER_KEY}`,
+            "HTTP-Referer": window.location.origin,
+            "X-Title": "Lawyer App Egypt",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            "model": model,
+            "messages": [
+              {"role": "system", "content": "أنت مساعد قانوني محترف في القانون المصري. اكتب بصياغة قانونية سليمة."},
+              {"role": "user", "content": `اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}`}
+            ]
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const result = data.choices?.[0]?.message?.content;
+          if (result) {
+            setText(result);
+            showToast(`تم التوليد بنجاح (${model.split('/')[1]})`, "success");
+            setLoading(false);
+            return;
+          }
         }
+      } catch (e) { 
+        console.error(`OpenRouter fallback failed for model ${model}`, e);
+        continue; 
       }
-    } catch (e) {
-      console.error("OpenRouter fallback failed");
     }
 
     setLoading(false);
-    showToast("فشل التوليد: جوجل تفرض قيوداً صارمة جداً. يرجى تجربة متصفح آخر أو المحاولة لاحقاً.", "error");
-    alert("لقد جربت كافة الحلول البرمجية بما فيها 'البروكسي' و 'المزود البديل'. إذا استمر الفشل، فهذا يعني أن هناك مشكلة في استقرار الشبكة لديك أو أن جوجل تحظر عنوان الـ IP الخاص بك تماماً. يرجى تجربة فتح الموقع من جهاز آخر أو شبكة أخرى للتأكد.");
+    showToast("فشل التوليد بكافة الطرق. يرجى مراجعة اتصال الإنترنت.", "error");
+    alert("لقد جربت كافة الحلول البرمجية (Gemini Proxies, OpenRouter Gemini, Mistral, Llama). إذا استمر الفشل، فهذا يعني أن هناك مشكلة في استقرار الشبكة لديك أو أن مزودي الخدمة يواجهون عطلاً مؤقتاً. يرجى تجربة فتح الموقع من جهاز آخر أو شبكة أخرى للتأكد.");
   };
 
   const downloadPDF = () => {
