@@ -2498,8 +2498,8 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     try {
       console.log("AI SYSTEM: SWITCHING TO DIRECT REST API FOR STABILITY...");
       
-      // الاتصال المباشر بـ REST API لتجنب مشاكل المكتبات (SDK) في المتصفح
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // استخدام v1 بدلاً من v1beta لضمان استقرار موديل gemini-1.5-flash
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
       
       const response = await fetch(apiUrl, {
         method: 'POST',
