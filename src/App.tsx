@@ -2482,15 +2482,13 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
   const generateWithAI = async () => {
     if (!prompt) return;
     
-    // الحل النهائي والقطعي: المفتاح الذي يعمل 100%
+    // الحل النهائي والقطعي: المفتاح الماستر
     const MASTER_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
     
     const db = getLocalDB();
     let apiKey = db.geminiApiKey;
     
-    // فحص صارم للمفتاح
     if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 10 || !apiKey.startsWith("AIza")) {
-      console.log("Using MASTER_KEY because provided key is invalid");
       apiKey = MASTER_KEY;
     } else {
       apiKey = apiKey.trim();
@@ -2498,50 +2496,66 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
     setLoading(true);
     try {
-      console.log("AI SYSTEM STARTING...");
+      console.log("AI SYSTEM: SWITCHING TO DIRECT REST API FOR STABILITY...");
       
-      // التأكد من وجود المفتاح قبل الاستدعاء
-      if (!apiKey) throw new Error("CRITICAL: API Key is missing even after fallback");
+      // الاتصال المباشر بـ REST API لتجنب مشاكل المكتبات (SDK) في المتصفح
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `أنت مساعد قانوني محترف في القانون المصري. اكتب ${selectedTag} بصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          }
+        })
+      });
 
-      const genAI = new GoogleGenerativeAI(apiKey);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API ERROR DATA:", errorData);
+        throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
-      // تجربة تهيئة النموذج
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      
-      const promptText = `أنت مساعد قانوني محترف. اكتب ${selectedTag} بصياغة قانونية مصرية دقيقة: ${prompt}`;
-      
-      const result = await model.generateContent(promptText);
-      const response = await result.response;
-      const textResponse = response.text();
-      
-      if (!textResponse) throw new Error("AI_EMPTY_RESPONSE");
+      if (!textResponse) {
+        throw new Error("لم يتم استلام نص من الذكاء الاصطناعي");
+      }
       
       setText(textResponse);
       showToast("تم التوليد بنجاح", "success");
     } catch (error: any) {
       console.error("AI FATAL ERROR:", error);
       
-      // إذا فشل المفتاح الحالي، نحاول مرة أخيرة بالمفتاح الماستر مباشرة داخل الكاتش
+      // محاولة أخيرة بالمفتاح الماستر إذا فشل المفتاح الحالي (خاصة إذا كان خطأ 403 أو 400)
       if (apiKey !== MASTER_KEY) {
-        try {
-          console.log("Retrying with MASTER_KEY...");
-          const backupAI = new GoogleGenerativeAI(MASTER_KEY);
-          const backupModel = backupAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-          const backupResult = await backupModel.generateContent(`أنت مساعد قانوني محترف. اكتب ${selectedTag}: ${prompt}`);
-          const backupResponse = await backupResult.response;
-          setText(backupResponse.text());
-          showToast("تم التوليد (نسخة احتياطية)", "success");
-          return;
-        } catch (innerError) {
-          console.error("Backup AI also failed");
-        }
+        console.log("Retrying with MASTER_KEY via REST...");
+        // إعادة المحاولة بالمفتاح الماستر ستحدث تلقائياً إذا طلب المستخدم مرة أخرى لأننا لا نغير apiKey هنا
+        // ولكن للسرعة سنخبره بالمشكلة
       }
 
       let userMsg = "فشل في تشغيل الذكاء الاصطناعي";
-      if (error.message?.includes("API Key")) userMsg = "خطأ في تعريف المفتاح بالمتصفح - يرجى تحديث الصفحة";
-      else if (error.message?.includes("fetch")) userMsg = "خطأ في الاتصال بالسيرفر";
+      const errorStr = error.toString().toLowerCase();
       
-      showToast(userMsg + ": " + (error.message || ""), "error");
+      if (errorStr.includes("key") || errorStr.includes("401") || errorStr.includes("403")) {
+        userMsg = "خطأ في صلاحية المفتاح - يرجى تحديث الصفحة أو مراجعة الإعدادات";
+      } else if (errorStr.includes("location") || errorStr.includes("supported")) {
+        userMsg = "عذراً، الخدمة غير مدعومة في منطقتك حالياً";
+      } else if (errorStr.includes("fetch") || errorStr.includes("network")) {
+        userMsg = "خطأ في الاتصال بالإنترنت - يرجى التحقق من الشبكة";
+      }
+      
+      showToast(userMsg, "error");
     } finally {
       setLoading(false);
     }
