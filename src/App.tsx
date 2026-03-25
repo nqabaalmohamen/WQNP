@@ -205,7 +205,7 @@ const initializeDB = () => {
     resetRequests: [],
     systemEvents: [], // سجل الأحداث المباشر
     activeSessions: [], // جلسات المستخدمين النشطة
-    geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA",
+    geminiApiKey: "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
     supabaseKey: "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
   };
@@ -285,8 +285,8 @@ const loadFromSupabase = async () => {
       const cloudDb = data[0].content;
       
       // التأكد من أن مفتاح Gemini موجود دائماً حتى لو فقد في السحابة
-      if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey === "MY_GEMINI_API_KEY") {
-        cloudDb.geminiApiKey = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
+      if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey === "MY_GEMINI_API_KEY" || cloudDb.geminiApiKey === "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA") {
+        cloudDb.geminiApiKey = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
       }
       
       saveLocalDB(cloudDb);
@@ -2483,7 +2483,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     if (!prompt) return;
     
     // المفتاح الثابت كحل احتياطي أخير
-    const DEFAULT_KEY = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
+    const DEFAULT_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
     
     const db = getLocalDB();
     // نفضل المفتاح الموجود في قاعدة البيانات، ثم المفتاح البيئي، ثم المفتاح الثابت
@@ -3089,8 +3089,8 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
               </div>
               <button 
                 onClick={() => {
-                  setGeminiKey("AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA");
-                  updateData({ geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA" });
+                  setGeminiKey("AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q");
+                  updateData({ geminiApiKey: "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q" });
                   showToast('تم استعادة مفتاح الذكاء الاصطناعي الافتراضي', 'success');
                 }}
                 className="text-blue-600 text-[10px] font-bold hover:underline"
