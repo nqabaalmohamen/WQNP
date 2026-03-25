@@ -97,13 +97,8 @@ const useOnlineStatus = () => {
 
     const handleOffline = () => {
       setIsOnline(false);
-      // تنبيه فوري وصارم
-      alert("تنبيه أمني: انقطع الاتصال بالإنترنت. سيتم حظر الوصول للنظام فوراً لضمان مزامنة البيانات.");
-      
-      // مسح البيانات المؤقتة لضمان عدم بقاء أي بيانات غير متزامنة محلياً
-      sessionStorage.clear();
-      localStorage.removeItem('lawyer_app_db');
-      window.location.reload(); 
+      // لا نقوم بمسح البيانات أو إعادة التحميل القسري لضمان استمرارية عمل المحامي
+      console.warn("تم فقد الاتصال بالإنترنت. النظام يعمل الآن في وضع عدم الاتصال.");
     };
 
     window.addEventListener('online', checkRealStatus);
@@ -216,12 +211,7 @@ const initializeDB = () => {
 };
 
 const saveLocalDB = (db: any) => {
-  // نقوم بمسح البيانات الحساسة إذا تم استدعاء الحفظ والإنترنت مقطوع
-  // لضمان عدم حفظ أي بيانات محلياً قد تكون غير متزامنة
-  if (!navigator.onLine) {
-    localStorage.removeItem('lawyer_app_db');
-    return;
-  }
+  // نحفظ البيانات محلياً دائماً لضمان استمرارية العمل حتى عند انقطاع الإنترنت
   localStorage.setItem('lawyer_app_db', JSON.stringify(db));
 };
 
@@ -235,10 +225,7 @@ const getSupabase = (db: any) => {
 
 const syncToSupabase = async (newDb: any) => {
   if (!navigator.onLine) {
-    console.error('Cannot sync: No internet connection');
-    // مسح البيانات المحلية لضمان عدم وجود بيانات غير متزامنة
-    localStorage.removeItem('lawyer_app_db');
-    window.location.reload();
+    console.warn('Cannot sync: No internet connection. Data is saved locally.');
     return;
   }
   const supabase = getSupabase(newDb);
@@ -249,7 +236,6 @@ const syncToSupabase = async (newDb: any) => {
       .upsert({ id: 1, content: newDb });
     if (error) {
       console.error('Supabase Sync Error:', error);
-      // We no longer remove local data on failure to prevent data loss
     }
   } catch (e) {
     console.error('Supabase Connection Error:', e);
@@ -3846,23 +3832,23 @@ export default function App() {
             <Route path="/login" element={<LoginScreen onLogin={handleLogin} showToast={showToast} />} />
             <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/login')} showToast={showToast} />} />
             
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
+            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={((data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications?.length) || 0) + (data?.reminders?.length || 0)} /> : <Navigate to="/login" />} />
             <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
+            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data?.cases || []} clients={data?.clients || []} tasks={data?.tasks || []} sessions={data?.sessions || []} reminders={data?.reminders || []} /> : <Navigate to="/login" />} />
             <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             
-            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/login" />} />
-            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/login" />} />
-            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/login" />} />
-            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data.sessions || []} onDelete={deleteSession} /> : <Navigate to="/login" />} />
-            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/login" />} />
-            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/login" />} />
+            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/login" />} />
+            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/login" />} />
+            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/login" />} />
+            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/login" />} />
+            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/login" />} />
+            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/login" />} />
             
-            <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={data.users.find((u:any)=>u.phone===user?.phone)?.notifications || []} reminders={data.reminders || []} onDelete={async (id) => {
+            <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications || []} reminders={data?.reminders || []} onDelete={async (id) => {
               const updatedUsers = data.users.map((u: any) => u.phone === user.phone ? { ...u, notifications: u.notifications.filter((n: any) => n.id !== id) } : u);
               await updateData({ users: updatedUsers });
               showToast('تم حذف الإشعار', 'success');
