@@ -81,6 +81,7 @@ const useOnlineStatus = () => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
+        // التحقق من الوصول الفعلي للسيرفر السحابي لضمان القدرة على المزامنة
         await fetch('https://ayxmuvfbhleijlynsdbv.supabase.co/rest/v1/', { 
           method: 'HEAD', 
           mode: 'no-cors',
@@ -95,19 +96,20 @@ const useOnlineStatus = () => {
 
     const handleOffline = () => {
       setIsOnline(false);
-      // تنبيه فوري كما طلب المستخدم
-      alert("تنبيه: لقد انقطع الاتصال بالإنترنت. سيتم إغلاق الجلسة فوراً لحماية البيانات.");
+      // تنبيه فوري وصارم
+      alert("تنبيه أمني: انقطع الاتصال بالإنترنت. سيتم حظر الوصول للنظام فوراً لضمان مزامنة البيانات.");
       
-      // مسح كافة البيانات الحساسة
+      // مسح البيانات المؤقتة لضمان عدم بقاء أي بيانات غير متزامنة محلياً
       sessionStorage.clear();
-      localStorage.clear();
+      localStorage.removeItem('lawyer_app_db');
       window.location.reload(); 
     };
 
     window.addEventListener('online', checkRealStatus);
     window.addEventListener('offline', handleOffline);
 
-    const interval = setInterval(checkRealStatus, 10000);
+    // فحص دوري كل 5 ثوانٍ لضمان استمرارية الاتصال
+    const interval = setInterval(checkRealStatus, 5000);
 
     return () => {
       window.removeEventListener('online', checkRealStatus);
@@ -123,27 +125,31 @@ const OfflineOverlay = () => (
   <motion.div
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
-    className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
+    className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
   >
-    <div className="w-32 h-32 bg-red-600/20 rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-600/10">
-      <XCircle className="w-16 h-16 text-red-500 animate-bounce" />
+    <div className="w-32 h-32 bg-red-600/20 rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-600/10 border border-red-500/30">
+      <XCircle className="w-16 h-16 text-red-500 animate-pulse" />
     </div>
-    <h1 className="text-4xl md:text-5xl font-black text-white mb-6 tracking-tight">تنبيه: لا يوجد إنترنت</h1>
-    <p className="text-slate-400 max-w-lg leading-relaxed mb-10 text-xl">
-      عذراً، هذا النظام يعمل بنظام <span className="text-red-500 font-bold">الحماية السحابية المشددة</span>. لا يمكن تصفح أي بيانات أو الوصول لأي خدمة دون اتصال نشط بالإنترنت.
+    <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">نظام المزامنة: غير متصل</h1>
+    <p className="text-slate-400 max-w-2xl leading-relaxed mb-10 text-xl md:text-2xl">
+      عذراً، تم <span className="text-red-500 font-bold">حظر الوصول للنظام</span> مؤقتاً لعدم وجود اتصال بالإنترنت.
+      <br />
+      يجب أن تكون متصلاً لضمان حفظ بياناتك ومزامنتها مع السحابة بشكل آمن.
     </p>
     <div className="flex flex-col gap-5 w-full max-w-sm">
       <button 
         onClick={() => window.location.reload()}
-        className="w-full py-5 bg-red-600 text-white rounded-3xl font-black text-xl shadow-2xl shadow-red-900/40 hover:bg-red-700 transition-all cursor-pointer transform hover:scale-105 active:scale-95"
+        className="w-full py-6 bg-red-600 text-white rounded-3xl font-black text-2xl shadow-2xl shadow-red-900/40 hover:bg-red-700 transition-all cursor-pointer transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
       >
-        إعادة فحص الاتصال
+        <Globe className="w-6 h-6" />
+        إعادة محاولة الاتصال
       </button>
-      <div className="flex items-center justify-center gap-3 text-slate-500 font-bold">
-        <div className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
-        جاري مراقبة الشبكة...
+      <div className="flex items-center justify-center gap-3 text-slate-500 font-bold bg-slate-900/50 py-3 rounded-2xl border border-slate-800">
+        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+        جاري مراقبة استقرار الشبكة...
       </div>
     </div>
+    <p className="mt-12 text-slate-600 text-sm font-medium">نقابة المحامين بالفيوم - نظام الحماية السحابي المشدد</p>
   </motion.div>
 );
 
@@ -209,6 +215,7 @@ const initializeDB = () => {
 
 const saveLocalDB = (db: any) => {
   // نقوم بمسح البيانات الحساسة إذا تم استدعاء الحفظ والإنترنت مقطوع
+  // لضمان عدم حفظ أي بيانات محلياً قد تكون غير متزامنة
   if (!navigator.onLine) {
     localStorage.removeItem('lawyer_app_db');
     return;
