@@ -2488,17 +2488,22 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     const MASTER_OR_KEY = "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";
     
     const db = getLocalDB();
+    const userGeminiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : "";
+    const userORKey = (db.openRouterApiKey && db.openRouterApiKey.startsWith("sk-or-v1-")) ? db.openRouterApiKey.trim() : "";
     
     // قائمة بالمفاتيح لتجربتها (مفتاح المستخدم أولاً ثم الماستر)
-    const geminiKeys = [apiKey.trim(), MASTER_GEMINI_KEY].filter(k => k && k.startsWith("AIza"));
-    const orKeys = [orKey.trim(), MASTER_OR_KEY].filter(k => k && k.startsWith("sk-or-v1-"));
+    const geminiKeys = [userGeminiKey, MASTER_GEMINI_KEY].filter(k => k && k.startsWith("AIza"));
+    const orKeys = [userORKey, MASTER_OR_KEY].filter(k => k && k.startsWith("sk-or-v1-"));
 
     setLoading(true);
     let success = false;
 
-    // المرحلة 1: محاولة Gemini عبر عدة مفاتيح ومسارات
+    // المرحلة 1: محاولة Gemini عبر البروكسيات (لتجاوز الحظر الجغرافي)
+    const proxies = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
+    
     for (const k of geminiKeys) {
       if (success) break;
+      // محاولة مباشرة أولاً
       try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${k}`, {
           method: 'POST',
@@ -2508,19 +2513,36 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
         if (response.ok) {
           const data = await response.json();
           const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (result) { setText(result); showToast("تم التوليد بنجاح", "success"); success = true; }
+          if (result) { setText(result); showToast("تم التوليد (Gemini Direct)", "success"); success = true; break; }
         }
-      } catch (e) { console.warn("Gemini attempt failed"); }
+      } catch (e) {}
+
+      // محاولة عبر البروكسيات إذا فشل المباشر
+      if (!success) {
+        for (const proxy of proxies) {
+          try {
+            const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${k}`;
+            const response = await fetch(proxy + encodeURIComponent(targetUrl), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: `اكتب ${selectedTag}: ${prompt}` }] }] })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (result) { setText(result); showToast("تم التوليد (Gemini Proxy)", "success"); success = true; break; }
+            }
+          } catch (e) {}
+        }
+      }
     }
 
-    // المرحلة 2: محاولة OpenRouter عبر عدة مفاتيح وموديلات (إذا فشل Gemini)
+    // المرحلة 2: محاولة OpenRouter (الحل الجذري)
     if (!success) {
       const orModels = [
         "google/gemini-2.0-flash-exp:free",
-        "google/gemini-flash-1.5",
         "mistralai/mistral-7b-instruct:free",
-        "meta-llama/llama-3-8b-instruct:free",
-        "qwen/qwen-2-7b-instruct:free"
+        "meta-llama/llama-3-8b-instruct:free"
       ];
 
       for (const k of orKeys) {
@@ -2546,9 +2568,9 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
             if (response.ok) {
               const data = await response.json();
               const result = data.choices?.[0]?.message?.content;
-              if (result) { setText(result); showToast("تم التوليد (نظام بديل)", "success"); success = true; }
+              if (result) { setText(result); showToast(`تم التوليد (${model.split('/')[1]})`, "success"); success = true; break; }
             }
-          } catch (e) { continue; }
+          } catch (e) {}
         }
       }
     }
