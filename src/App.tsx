@@ -3529,18 +3529,43 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return sessionStorage.getItem('isLoggedIn') === 'true';
+    const sessionStart = localStorage.getItem('sessionStart');
+    if (sessionStart) {
+      const fiveDays = 5 * 24 * 60 * 60 * 1000;
+      if (Date.now() - parseInt(sessionStart) > fiveDays) {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('user');
+        localStorage.removeItem('sessionStart');
+        return false;
+      }
+    }
+    return localStorage.getItem('isLoggedIn') === 'true';
   });
   const [user, setUser] = useState<any>(() => {
     try {
-      const savedUser = sessionStorage.getItem('user');
+      const savedUser = localStorage.getItem('user');
       return savedUser ? JSON.parse(savedUser) : null;
     } catch (error) {
-      console.error("Failed to parse user data from sessionStorage", error);
-      sessionStorage.removeItem('user'); // Clear corrupted data
+      console.error("Failed to parse user data from localStorage", error);
+      localStorage.removeItem('user');
       return null;
     }
   });
+
+  // Check session expiry periodically
+  useEffect(() => {
+    const checkExpiry = () => {
+      const sessionStart = localStorage.getItem('sessionStart');
+      if (sessionStart && isLoggedIn) {
+        const fiveDays = 5 * 24 * 60 * 60 * 1000;
+        if (Date.now() - parseInt(sessionStart) > fiveDays) {
+          logout();
+        }
+      }
+    };
+    const interval = setInterval(checkExpiry, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
@@ -3636,8 +3661,9 @@ export default function App() {
   const handleLogin = async (userData: any) => {
     setUser(userData);
     setIsLoggedIn(true);
-    sessionStorage.setItem('isLoggedIn', 'true');
-    sessionStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('sessionStart', Date.now().toString());
 
     // تحديث الجلسات النشطة
     const session = {
@@ -3692,8 +3718,9 @@ export default function App() {
 
     setIsLoggedIn(false);
     setUser(null);
-    sessionStorage.removeItem('isLoggedIn');
-    sessionStorage.removeItem('user');
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('user');
+    localStorage.removeItem('sessionStart');
     navigate('/login');
     showToast('تم تسجيل الخروج بنجاح', 'success');
   };
