@@ -283,6 +283,12 @@ const loadFromSupabase = async () => {
 
     if (data && data.length > 0 && data[0].content) {
       const cloudDb = data[0].content;
+      
+      // التأكد من أن مفتاح Gemini موجود دائماً حتى لو فقد في السحابة
+      if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey === "MY_GEMINI_API_KEY") {
+        cloudDb.geminiApiKey = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
+      }
+      
       saveLocalDB(cloudDb);
       return cloudDb;
     } else {
@@ -2477,22 +2483,24 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     if (!prompt) return;
     
     // المفتاح الثابت كحل احتياطي أخير
-    const MY_KEY = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
+    const DEFAULT_KEY = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
     
     const db = getLocalDB();
-    const apiKey = db.geminiApiKey || MY_KEY;
+    // نفضل المفتاح الموجود في قاعدة البيانات، ثم المفتاح البيئي، ثم المفتاح الثابت
+    let apiKey = db.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || DEFAULT_KEY;
 
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-      return showToast("يرجى ضبط مفتاح الذكاء الاصطناعي من إعدادات المسؤول.", "error");
+    // إذا كان المفتاح غير صالح أو placeholder، نستخدم المفتاح الثابت فوراً
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || !apiKey.startsWith("AIza")) {
+      console.warn("Invalid or missing API Key, falling back to default key.");
+      apiKey = DEFAULT_KEY;
     }
 
     setLoading(true);
     try {
-      // استخدام الطريقة الأكثر أماناً لتهيئة GoogleGenAI في المتصفح
-      // التأكد من أننا نمرر الكائن بالشكل الذي تتوقعه المكتبة
-      const genAI = new GoogleGenAI(apiKey);
+      console.log("AI Initialization - Key prefix:", apiKey.substring(0, 7));
       
-      // الحصول على النموذج مع إعدادات صريحة
+      // تهيئة صريحة ومباشرة
+      const genAI = new GoogleGenAI(apiKey);
       const model = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash"
       });
@@ -2510,13 +2518,14 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
       setText(textResponse);
       showToast("تم توليد النص بنجاح", "success");
     } catch (error: any) {
-      console.error("AI Error Details:", error);
+      console.error("AI Generation Detailed Error:", error);
       
-      // معالجة الخطأ الخاص بـ API Key في المتصفح بشكل صريح
-      if (error.message?.includes("API Key")) {
-        showToast("خطأ في مفتاح الـ API: يرجى التحقق من صحة المفتاح في الإعدادات", "error");
+      // معالجة الخطأ الخاص بـ API Key بشكل مفصل
+      const errorMsg = error.message || "";
+      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401")) {
+        showToast("خطأ في صلاحية مفتاح الـ API. يرجى التأكد من المفتاح في إعدادات المسؤول.", "error");
       } else {
-        showToast("فشل الذكاء الاصطناعي: " + (error.message || "تأكد من الاتصال بالإنترنت"), "error");
+        showToast("فشل الذكاء الاصطناعي: " + (errorMsg || "تأكد من الاتصال بالإنترنت"), "error");
       }
     } finally {
       setLoading(false);
@@ -3078,6 +3087,16 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
                 <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="أدخل Gemini API Key هنا..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
                 <button onClick={saveGeminiKey} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-colors">حفظ</button>
               </div>
+              <button 
+                onClick={() => {
+                  setGeminiKey("AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA");
+                  updateData({ geminiApiKey: "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA" });
+                  showToast('تم استعادة مفتاح الذكاء الاصطناعي الافتراضي', 'success');
+                }}
+                className="text-blue-600 text-[10px] font-bold hover:underline"
+              >
+                استعادة المفتاح الافتراضي (الموصى به)
+              </button>
             </div>
             <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
               <div className="flex items-center gap-3 text-blue-600 mb-2">
