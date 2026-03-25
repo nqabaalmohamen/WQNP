@@ -537,106 +537,88 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen:
   </AnimatePresence>
 );
 
-const LandingPage = () => {
-  const navigate = useNavigate();
+const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="relative h-[80vh] flex items-center justify-center overflow-hidden bg-slate-950">
-        <div className="absolute inset-0 opacity-20">
-          <img 
-            src="https://picsum.photos/seed/justice/1920/1080" 
-            alt="Background" 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-transparent to-slate-950" />
+    <motion.div 
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[3000] bg-slate-950 flex flex-col items-center justify-center overflow-hidden"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950" />
+      
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative mb-12"
+      >
+        <div className="absolute inset-0 bg-blue-500 blur-[120px] opacity-30 animate-pulse" />
+        <div className="relative bg-slate-900/50 p-8 rounded-[40px] border border-white/10 backdrop-blur-2xl shadow-2xl">
+          <Scale className="w-24 h-24 md:w-32 md:h-32 text-blue-500" />
         </div>
-        
-        <div className="relative z-10 text-center px-6 max-w-4xl">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <Scale className="w-20 h-20 text-blue-500 mx-auto mb-8" />
-            <h1 className="text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-              المنصة الرقمية لنقابة المحامين بالفيوم <span className="text-blue-500">ترحب بك</span>
-            </h1>
-            <p className="text-xl text-slate-300 mb-10 leading-relaxed">
-              المنصة الرسمية لنقابة المحامين بالفيوم - أدوات ذكية، مكتبة قانونية، ومجتمع متكامل في مكان واحد.
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-              <button 
-                onClick={() => navigate('/signup')}
-                className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/20 hover:bg-blue-700 transition-all cursor-pointer"
-              >
-                ابدأ رحلتك الآن
-              </button>
-              <button 
-                onClick={() => navigate('/login')}
-                className="w-full md:w-auto px-8 py-4 bg-white/10 text-white border border-white/20 rounded-2xl font-bold text-lg backdrop-blur-md hover:bg-white/20 transition-all cursor-pointer"
-              >
-                تسجيل الدخول
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      </motion.div>
+      
+      <div className="text-center relative z-10 space-y-4">
+        <motion.h1
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
+          className="text-4xl md:text-6xl font-black text-white tracking-tighter"
+        >
+          نقابة المحامين
+        </motion.h1>
+        <motion.div
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 1, duration: 1 }}
+          className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-full max-w-[300px] mx-auto"
+        />
+        <motion.h2
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.8, duration: 0.8 }}
+          className="text-2xl md:text-3xl font-bold text-blue-500 tracking-[0.4em] pr-[0.4em]"
+        >
+          بالفيوم
+        </motion.h2>
+      </div>
 
-      {/* Features Grid */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">خدمات المنصة الذكية</h2>
-          <p className="text-slate-500">كل ما يحتاجه المحامي العصري في واجهة واحدة متطورة</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { icon: Wand2, title: 'المساعد الذكي', desc: 'صياغة العقود والمذكرات القانونية باستخدام الذكاء الاصطناعي (ستتوفر هذه الخدمة قريباً).' },
-            { icon: BookOpen, title: 'المكتبة الرقمية', desc: 'أرشيف ضخم من القوانين، الأحكام، والكتب القانونية المتاحة للتحميل.' },
-            { icon: Briefcase, title: 'المكتب الافتراضي', desc: 'إدارة القضايا، الموكلين، والجلسات بنظام تنبيهات ذكي.' },
-            { icon: Users, title: 'مجتمع المحامين', desc: 'تواصل مع الزملاء، شارك الخبرات، وابقَ على اطلاع بأحدث أخبار النقابة.' },
-            { icon: Globe, title: 'المنصات الحكومية', desc: 'وصول سريع ومباشر لكافة المنصات القضائية والحكومية المصرية.' },
-            { icon: ShieldCheck, title: 'أمان البيانات', desc: 'نظام تشفير متطور لحماية بياناتك وبيانات موكليك بخصوصية تامة.' },
-          ].map((feature, i) => (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 2, duration: 1 }}
+        className="absolute bottom-12 flex flex-col items-center gap-4"
+      >
+        <div className="flex gap-1">
+          {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              whileHover={{ y: -10 }}
-              className="p-8 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl transition-all"
-            >
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6">
-                <feature.icon className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">{feature.desc}</p>
-            </motion.div>
+              animate={{ 
+                scale: [1, 1.5, 1],
+                opacity: [0.3, 1, 0.3]
+              }}
+              transition={{ 
+                duration: 1, 
+                repeat: Infinity, 
+                delay: i * 0.2 
+              }}
+              className="w-2 h-2 bg-blue-500 rounded-full"
+            />
           ))}
         </div>
-      </section>
+        <p className="text-slate-500 text-sm font-bold tracking-widest uppercase">
+          المنصة الرقمية الذكية
+        </p>
+      </motion.div>
 
-      {/* Stats Section */}
-      <section className="bg-blue-600 py-20 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center text-white">
-          <div>
-            <p className="text-4xl font-black mb-2">+5000</p>
-            <p className="text-sm opacity-80">عضو مسجل</p>
-          </div>
-          <div>
-            <p className="text-4xl font-black mb-2">+10k</p>
-            <p className="text-sm opacity-80">مستند قانوني</p>
-          </div>
-          <div>
-            <p className="text-4xl font-black mb-2">24/7</p>
-            <p className="text-sm opacity-80">دعم فني</p>
-          </div>
-          <div>
-            <p className="text-4xl font-black mb-2">100%</p>
-            <p className="text-sm opacity-80">تحول رقمي</p>
-          </div>
-        </div>
-      </section>
-    </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 4 }}
+        onAnimationComplete={() => setTimeout(onComplete, 500)}
+      />
+    </motion.div>
   );
 };
 
@@ -3561,6 +3543,7 @@ export default function App() {
   // --- Centralized Data State ---
   const [data, setData] = useState<any>(() => getLocalDB());
   const [isLoading, setIsLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const sessionStart = localStorage.getItem('sessionStart');
@@ -3659,6 +3642,10 @@ export default function App() {
 
   if (!isOnline) {
     return <OfflineOverlay />;
+  }
+
+  if (showSplash) {
+    return <SplashIntro onComplete={() => setShowSplash(false)} />;
   }
 
   if (isLoading) {
@@ -3801,12 +3788,11 @@ export default function App() {
     logEvent('حذف مهمة', `تم حذف مهمة: ${t?.title || id}`, 'normal');
   });
 
-  const isLandingPage = location.pathname === '/';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+  const isAuthPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-right" dir="rtl">
-      {!hasCloudDB && !isLandingPage && !isAuthPage && (
+      {!hasCloudDB && !isAuthPage && (
         <div className="bg-red-600 text-white text-[10px] py-1.5 px-4 text-center font-bold sticky top-0 z-[60] animate-pulse">
           تحذير: البيانات مخزنة محلياً فقط. اربط قاعدة البيانات السحابية (Supabase) من الإعدادات لضمان المزامنة والأمان.
         </div>
@@ -3828,36 +3814,36 @@ export default function App() {
 
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginScreen onLogin={handleLogin} showToast={showToast} />} />
-            <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/login')} showToast={showToast} />} />
+            <Route path="/" element={isLoggedIn ? <Navigate to="/home" /> : <LoginScreen onLogin={handleLogin} showToast={showToast} />} />
+            <Route path="/login" element={<Navigate to="/" />} />
+            <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/')} showToast={showToast} />} />
             
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={((data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications?.length) || 0) + (data?.reminders?.length || 0)} /> : <Navigate to="/login" />} />
-            <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
+            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={((data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications?.length) || 0) + (data?.reminders?.length || 0)} /> : <Navigate to="/" />} />
+            <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
             
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data?.cases || []} clients={data?.clients || []} tasks={data?.tasks || []} sessions={data?.sessions || []} reminders={data?.reminders || []} /> : <Navigate to="/login" />} />
-            <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
-            <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
-            <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
-            <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
+            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data?.cases || []} clients={data?.clients || []} tasks={data?.tasks || []} sessions={data?.sessions || []} reminders={data?.reminders || []} /> : <Navigate to="/" />} />
+            <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+            <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
+            <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+            <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
             
-            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/login" />} />
-            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/login" />} />
-            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/login" />} />
-            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/login" />} />
-            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/login" />} />
-            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/login" />} />
+            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/" />} />
+            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/" />} />
+            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/" />} />
+            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/" />} />
+            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/" />} />
+            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/" />} />
             
             <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications || []} reminders={data?.reminders || []} onDelete={async (id) => {
               const updatedUsers = data.users.map((u: any) => u.phone === user.phone ? { ...u, notifications: u.notifications.filter((n: any) => n.id !== id) } : u);
               await updateData({ users: updatedUsers });
               showToast('تم حذف الإشعار', 'success');
-            }} /> : <Navigate to="/login" />} />
+            }} /> : <Navigate to="/" />} />
             
-            <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/login" />} />
-            <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
-            <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
-            <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/login" />} />
+            <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
+            <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+            <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+            <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
           </Routes>
         </main>
 
