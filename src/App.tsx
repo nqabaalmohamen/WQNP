@@ -2482,103 +2482,33 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
   const generateWithAI = async () => {
     if (!prompt) return;
-    
-    // المفاتيح الماستر الموثوقة
-    const MASTER_GEMINI_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
-    const MASTER_OR_KEY = "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";
-    
-    const db = getLocalDB();
-    const userGeminiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : "";
-    const userORKey = (db.openRouterApiKey && db.openRouterApiKey.startsWith("sk-or-v1-")) ? db.openRouterApiKey.trim() : "";
-    
-    // قائمة بالمفاتيح لتجربتها (مفتاح المستخدم أولاً ثم الماستر)
-    const geminiKeys = [userGeminiKey, MASTER_GEMINI_KEY].filter(k => k && k.startsWith("AIza"));
-    const orKeys = [userORKey, MASTER_OR_KEY].filter(k => k && k.startsWith("sk-or-v1-"));
 
     setLoading(true);
-    let success = false;
+    try {
+      const response = await fetch("/.netlify/functions/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, selectedTag })
+      });
 
-    // المرحلة 1: محاولة Gemini عبر البروكسيات (لتجاوز الحظر الجغرافي)
-    const proxies = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
-    
-    for (const k of geminiKeys) {
-      if (success) break;
-      // محاولة مباشرة أولاً
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${k}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني محترف. اكتب ${selectedTag}: ${prompt}` }] }] })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (result) { setText(result); showToast("تم التوليد (Gemini Direct)", "success"); success = true; break; }
-        }
-      } catch (e) {}
-
-      // محاولة عبر البروكسيات إذا فشل المباشر
-      if (!success) {
-        for (const proxy of proxies) {
-          try {
-            const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${k}`;
-            const response = await fetch(proxy + encodeURIComponent(targetUrl), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: `اكتب ${selectedTag}: ${prompt}` }] }] })
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (result) { setText(result); showToast("تم التوليد (Gemini Proxy)", "success"); success = true; break; }
-            }
-          } catch (e) {}
-        }
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Server-side AI error");
       }
-    }
 
-    // المرحلة 2: محاولة OpenRouter (الحل الجذري)
-    if (!success) {
-      const orModels = [
-        "google/gemini-2.0-flash-exp:free",
-        "mistralai/mistral-7b-instruct:free",
-        "meta-llama/llama-3-8b-instruct:free"
-      ];
-
-      for (const k of orKeys) {
-        if (success) break;
-        for (const model of orModels) {
-          if (success) break;
-          try {
-            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${k}`,
-                "HTTP-Referer": window.location.origin,
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                "model": model,
-                "messages": [
-                  { "role": "system", "content": "أنت مساعد قانوني محترف." },
-                  { "role": "user", "content": `اكتب ${selectedTag}: ${prompt}` }
-                ]
-              })
-            });
-            if (response.ok) {
-              const data = await response.json();
-              const result = data.choices?.[0]?.message?.content;
-              if (result) { setText(result); showToast(`تم التوليد (${model.split('/')[1]})`, "success"); success = true; break; }
-            }
-          } catch (e) {}
-        }
+      const data = await response.json();
+      if (data.text) {
+        setText(data.text);
+        showToast("تم التوليد بنجاح (عبر السيرفر)", "success");
+      } else {
+        throw new Error("No text returned from server");
       }
-    }
 
-    setLoading(false);
-    if (!success) {
-      showToast("فشل التوليد بكافة الطرق. يرجى مراجعة الإنترنت أو المفاتيح.", "error");
-      alert("عذراً، يبدو أن هناك ضغطاً كبيراً على السيرفرات حالياً أو أن كافة المفاتيح قد تعطلت مؤقتاً. يرجى تجربة التوليد مرة أخرى بعد قليل أو استخدام شبكة إنترنت أخرى.");
+    } catch (error: any) {
+      console.error("AI Fetch Error:", error);
+      showToast(`فشل التوليد: ${error.message}`, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
