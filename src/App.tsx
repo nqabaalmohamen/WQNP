@@ -62,6 +62,8 @@ import { ar } from 'date-fns/locale';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+const BUILD_DATE = "2026-03-25 01:10 PM"; // توقيع زمني للتحديث المباشر
+
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -247,8 +249,7 @@ const syncToSupabase = async (newDb: any) => {
       .upsert({ id: 1, content: newDb });
     if (error) {
       console.error('Supabase Sync Error:', error);
-      // إذا فشل التحديث السحابي، لا نحتفظ بالبيانات المحلية لضمان النزاهة
-      localStorage.removeItem('lawyer_app_db');
+      // We no longer remove local data on failure to prevent data loss
     }
   } catch (e) {
     console.error('Supabase Connection Error:', e);
@@ -256,17 +257,16 @@ const syncToSupabase = async (newDb: any) => {
 };
 
 const loadFromSupabase = async () => {
+  const localDb = getLocalDB();
+  
   if (!navigator.onLine) {
-    localStorage.removeItem('lawyer_app_db');
-    throw new Error('No internet connection');
+    return localDb;
   }
 
-  const localDb = getLocalDB();
   const supabase = getSupabase(localDb);
   
   if (!supabase) {
-    // إذا لم توجد إعدادات سحابية، لا نقوم بتحميل أي شيء
-    throw new Error('Supabase configuration missing');
+    return localDb;
   }
   
   try {
@@ -277,8 +277,7 @@ const loadFromSupabase = async () => {
     
     if (error) {
       console.error('Supabase fetch error:', error.message);
-      localStorage.removeItem('lawyer_app_db'); // مسح المحلي عند الفشل
-      throw error;
+      return localDb;
     }
 
     if (data && data.length > 0 && data[0].content) {
@@ -298,10 +297,8 @@ const loadFromSupabase = async () => {
     }
   } catch (e) {
     console.error('Critical Supabase error:', e);
-    localStorage.removeItem('lawyer_app_db');
-    throw e;
+    return localDb;
   }
-  return localDb;
 };
 
 const mockFetch = async (url: string, options: any = {}) => {
@@ -803,6 +800,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) 
             </div>
             
             <div className="p-6 border-t border-gray-100">
+              <p className="text-[10px] text-gray-400 text-center mb-1">آخر تحديث: {BUILD_DATE}</p>
               <p className="text-xs text-gray-400 text-center">الإصدار 1.0.0</p>
             </div>
           </motion.div>
@@ -3575,8 +3573,8 @@ export default function App() {
   const isOnline = useOnlineStatus();
   
   // --- Centralized Data State ---
-  const [data, setData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<any>(() => getLocalDB());
+  const [isLoading, setIsLoading] = useState(false);
   
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     const sessionStart = localStorage.getItem('sessionStart');
@@ -3625,19 +3623,13 @@ export default function App() {
   useEffect(() => {
     const initApp = async () => {
       if (!navigator.onLine) {
-        setIsLoading(false);
-        return; // OfflineOverlay will handle this
+        return;
       }
-      setIsLoading(true);
       try {
         const cloudData = await loadFromSupabase();
-        setData(cloudData);
+        if (cloudData) setData(cloudData);
       } catch (e) {
-        console.error("Initialization failed:", e);
-        // لا نقوم بالتحميل من التخزين المحلي كبديل عند الفشل
-        setData(null);
-      } finally {
-        setIsLoading(false);
+        console.error("Initialization sync failed, using local data:", e);
       }
     };
     initApp();
