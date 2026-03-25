@@ -1075,14 +1075,14 @@ const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, no
       {/* AI Feature */}
       <motion.button 
         whileTap={{ scale: 0.98 }}
-        onClick={() => navigate('/writing')}
+        onClick={() => showToast('هذه الخدمة ستكون متاحة قريباً جداً لخدمة السادة المحامين بالفيوم', 'info')}
         className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-2xl flex items-center justify-between text-white shadow-lg cursor-pointer"
       >
         <div className="flex items-center gap-3">
           <div className="bg-white/20 p-2 rounded-lg">
             <Sparkles className="w-6 h-6" />
           </div>
-          <span className="font-bold">كتابة العرائض بـ Ai (متاح الآن)</span>
+          <span className="font-bold">كتابة العرائض بـ Ai (قريباً)</span>
         </div>
         <FileText className="w-5 h-5 opacity-50" />
       </motion.button>
