@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from '@supabase/supabase-js';
 import html2pdf from 'html2pdf.js';
 import { 
@@ -2500,13 +2500,9 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     try {
       console.log("Radical AI Init - Key Check:", apiKey.substring(0, 10) + "...");
       
-      const genAI = new GoogleGenAI(apiKey);
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
-        generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.7,
-        }
       });
       
       const promptText = `أنت مساعد قانوني خبير ومحترف في القانون المصري. قم بكتابة ${selectedTag} باللغة العربية الفصحى وبصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`;
