@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from '@supabase/supabase-js';
 import html2pdf from 'html2pdf.js';
 import { 
@@ -2485,10 +2484,19 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
     setLoading(true);
     try {
-      const response = await fetch("/.netlify/functions/generate", {
+      // Get API key from local storage
+      const localData = localStorage.getItem('lawyer_app_db');
+      let apiKey = '';
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        apiKey = parsed.geminiApiKey || '';
+      }
+
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          apiKey: apiKey,
           contents: [{
             parts: [{
               text: `أنت مساعد قانوني محترف في القانون المصري. اكتب ${selectedTag} بصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`
