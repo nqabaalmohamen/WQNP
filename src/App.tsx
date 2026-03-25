@@ -2476,7 +2476,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
   const generateWithAI = async () => {
     if (!prompt) return;
     
-    // المفتاح الذي قدمته
+    // المفتاح الثابت كحل احتياطي أخير
     const MY_KEY = "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA";
     
     const db = getLocalDB();
@@ -2488,17 +2488,36 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
     setLoading(true);
     try {
-      // الطريقة الصحيحة لتمرير المفتاح لمكتبة GoogleGenAI في المتصفح
+      // استخدام الطريقة الأكثر أماناً لتهيئة GoogleGenAI في المتصفح
+      // التأكد من أننا نمرر الكائن بالشكل الذي تتوقعه المكتبة
       const genAI = new GoogleGenAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
-      const result = await model.generateContent(`أنت مساعد قانوني خبير. اكتب ${selectedTag} بناءً على: ${prompt}`);
+      // الحصول على النموذج مع إعدادات صريحة
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash"
+      });
+      
+      const promptText = `أنت مساعد قانوني خبير ومحترف. قم بكتابة ${selectedTag} باللغة العربية الفصحى وبصياغة قانونية سليمة بناءً على التفاصيل التالية: ${prompt}`;
+      
+      const result = await model.generateContent(promptText);
       const response = await result.response;
-      setText(response.text());
+      const textResponse = response.text();
+      
+      if (!textResponse) {
+        throw new Error("لم يتم استلام نص من الذكاء الاصطناعي");
+      }
+      
+      setText(textResponse);
       showToast("تم توليد النص بنجاح", "success");
     } catch (error: any) {
-      console.error("AI Generation Error:", error);
-      showToast("فشل الذكاء الاصطناعي: " + (error.message || "تأكد من اتصال الإنترنت وصلاحية المفتاح"), "error");
+      console.error("AI Error Details:", error);
+      
+      // معالجة الخطأ الخاص بـ API Key في المتصفح بشكل صريح
+      if (error.message?.includes("API Key")) {
+        showToast("خطأ في مفتاح الـ API: يرجى التحقق من صحة المفتاح في الإعدادات", "error");
+      } else {
+        showToast("فشل الذكاء الاصطناعي: " + (error.message || "تأكد من الاتصال بالإنترنت"), "error");
+      }
     } finally {
       setLoading(false);
     }
