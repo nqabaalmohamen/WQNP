@@ -2488,7 +2488,13 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
       const response = await fetch("/.netlify/functions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, selectedTag })
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `أنت مساعد قانوني محترف في القانون المصري. اكتب ${selectedTag} بصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`
+            }]
+          }]
+        })
       });
 
       if (!response.ok) {
@@ -2497,8 +2503,10 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
       }
 
       const data = await response.json();
-      if (data.text) {
-        setText(data.text);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (text) {
+        setText(text);
         showToast("تم التوليد بنجاح (عبر السيرفر)", "success");
       } else {
         throw new Error("No text returned from server");
