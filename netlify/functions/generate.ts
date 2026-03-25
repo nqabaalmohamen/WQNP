@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const GEMINI_KEY = process.env.VITE_GEMINI_API_KEY;
+const GEMINI_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q"; // المفتاح مثبت هنا لضمان العمل
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
 export default async (req: Request) => {
