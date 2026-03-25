@@ -74,16 +74,43 @@ const useOnlineStatus = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleStatusChange = () => {
-      setIsOnline(navigator.onLine);
+    const checkRealStatus = async () => {
+      if (!navigator.onLine) {
+        handleOffline();
+        return;
+      }
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        // التحقق من الوصول الفعلي للسيرفر السحابي لضمان القدرة على المزامنة
+        await fetch('https://ayxmuvfbhleijlynsdbv.supabase.co/rest/v1/', { 
+          method: 'HEAD', 
+          mode: 'no-cors',
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+        setIsOnline(true);
+      } catch (e) {
+        handleOffline();
+      }
     };
 
-    window.addEventListener('online', handleStatusChange);
-    window.addEventListener('offline', handleStatusChange);
+    const handleOffline = () => {
+      setIsOnline(false);
+      // لا نقوم بمسح البيانات أو إعادة التحميل القسري لضمان استمرارية عمل المحامي
+      console.warn("تم فقد الاتصال بالإنترنت. النظام يعمل الآن في وضع عدم الاتصال.");
+    };
+
+    window.addEventListener('online', checkRealStatus);
+    window.addEventListener('offline', handleOffline);
+
+    // فحص دوري كل 5 ثوانٍ لضمان استمرارية الاتصال
+    const interval = setInterval(checkRealStatus, 5000);
 
     return () => {
-      window.removeEventListener('online', handleStatusChange);
-      window.removeEventListener('offline', handleStatusChange);
+      window.removeEventListener('online', checkRealStatus);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
     };
   }, []);
 
@@ -511,21 +538,12 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen:
 );
 
 const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
-  const [canSkip, setCanSkip] = useState(false);
-
   useEffect(() => {
-    // إظهار زر التخطي بعد ثانيتين لضمان عدم تعليق المستخدم
-    const skipTimer = setTimeout(() => setCanSkip(true), 2000);
-    
-    // إكمال تلقائي بعد 4.5 ثانية
-    const autoTimer = setTimeout(() => {
+    // نستخدم setTimeout لضمان انتهاء الدخلة مهما حدث في الأنيميشن
+    const timer = setTimeout(() => {
       onComplete();
-    }, 4500);
-
-    return () => {
-      clearTimeout(skipTimer);
-      clearTimeout(autoTimer);
-    };
+    }, 4500); // 4.5 ثوانٍ كافية لكل الحركات
+    return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
@@ -535,16 +553,16 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[3000] bg-slate-950 flex flex-col items-center justify-center overflow-hidden"
     >
-      <div className="absolute inset-0 bg-slate-950" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#1e293b_0%,_#020617_100%)] opacity-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950" />
       
       <motion.div
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 1, ease: "easeOut" }}
+        initial={{ scale: 0.5, opacity: 0, rotate: -10 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
         className="relative mb-12"
       >
-        <div className="relative bg-slate-900/80 p-8 rounded-[40px] border border-white/10 shadow-2xl">
+        <div className="absolute inset-0 bg-blue-500 blur-[120px] opacity-30 animate-pulse" />
+        <div className="relative bg-slate-900/50 p-8 rounded-[40px] border border-white/10 backdrop-blur-2xl shadow-2xl">
           <Scale className="w-24 h-24 md:w-32 md:h-32 text-blue-500" />
         </div>
       </motion.div>
@@ -553,7 +571,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
         <motion.h1
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
           className="text-4xl md:text-6xl font-black text-white tracking-tighter"
         >
           نقابة المحامين
@@ -561,38 +579,46 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
         <motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
-          transition={{ delay: 0.6, duration: 0.8 }}
-          className="h-1 bg-blue-500 w-48 mx-auto"
+          transition={{ delay: 1, duration: 1 }}
+          className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-full max-w-[300px] mx-auto"
         />
         <motion.h2
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.6 }}
-          className="text-2xl md:text-3xl font-bold text-blue-500 tracking-[0.3em] pr-[0.3em]"
+          transition={{ delay: 0.8, duration: 0.8 }}
+          className="text-2xl md:text-3xl font-bold text-blue-500 tracking-[0.4em] pr-[0.4em]"
         >
           بالفيوم
         </motion.h2>
       </div>
 
-      {/* Skip Button for Mobile Reliability */}
-      <AnimatePresence>
-        {canSkip && (
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            onClick={onComplete}
-            className="absolute bottom-24 px-6 py-2 bg-white/5 border border-white/10 text-white/40 rounded-full text-xs font-bold hover:bg-white/10 transition-all cursor-pointer"
-          >
-            تخطي الدخلة
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      <div className="absolute bottom-12 flex flex-col items-center gap-4">
-        <p className="text-slate-500 text-[10px] font-bold tracking-widest uppercase opacity-50">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 2, duration: 1 }}
+        className="absolute bottom-12 flex flex-col items-center gap-4"
+      >
+        <div className="flex gap-1">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              animate={{ 
+                scale: [1, 1.5, 1],
+                opacity: [0.3, 1, 0.3]
+              }}
+              transition={{ 
+                duration: 1, 
+                repeat: Infinity, 
+                delay: i * 0.2 
+              }}
+              className="w-2 h-2 bg-blue-500 rounded-full"
+            />
+          ))}
+        </div>
+        <p className="text-slate-500 text-sm font-bold tracking-widest uppercase">
           المنصة الرقمية الذكية
         </p>
-      </div>
+      </motion.div>
     </motion.div>
   );
 };
@@ -2653,7 +2679,7 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-8"
+        className="w-full max-w-md bg-slate-900/50 backdrop-blur-xl border border-slate-800 p-8 rounded-3xl shadow-2xl space-y-8"
       >
         <div className="text-center space-y-2">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-blue-900/20 mb-4">
@@ -3615,6 +3641,10 @@ export default function App() {
     await updateData({ systemEvents: updatedEvents });
   };
 
+  if (!isOnline) {
+    return <OfflineOverlay />;
+  }
+
   if (showSplash) {
     return <SplashIntro onComplete={() => setShowSplash(false)} />;
   }
@@ -3763,12 +3793,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-right" dir="rtl">
-      {!isOnline && (
-        <div className="bg-amber-600 text-white text-[10px] py-1 px-4 text-center font-bold sticky top-0 z-[100] flex items-center justify-center gap-2">
-          <Globe className="w-3 h-3 animate-pulse" />
-          أنت تعمل الآن في وضع عدم الاتصال. سيتم مزامنة البيانات عند عودة الإنترنت.
-        </div>
-      )}
       {!hasCloudDB && !isAuthPage && (
         <div className="bg-red-600 text-white text-[10px] py-1.5 px-4 text-center font-bold sticky top-0 z-[60] animate-pulse">
           تحذير: البيانات مخزنة محلياً فقط. اربط قاعدة البيانات السحابية (Supabase) من الإعدادات لضمان المزامنة والأمان.
