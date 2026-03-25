@@ -206,6 +206,7 @@ const initializeDB = () => {
     systemEvents: [], // سجل الأحداث المباشر
     activeSessions: [], // جلسات المستخدمين النشطة
     geminiApiKey: "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q",
+    openRouterApiKey: "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",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
     supabaseKey: "sb_publishable_83xDiBAKDNrlH2rm1wIiSw_qY2-zKKy" 
   };
@@ -2488,66 +2489,76 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     
     const db = getLocalDB();
     let apiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : GEMINI_KEY;
+    let orKey = (db.openRouterApiKey) ? db.openRouterApiKey.trim() : OPENROUTER_KEY;
 
     setLoading(true);
     let errorLog = "";
     
-    // الاستراتيجية 1: محاولة الاتصال المباشر والمحمي (Proxies) لـ Gemini
-    const proxies = [
-      "https://corsproxy.io/?",
-      "https://api.allorigins.win/raw?url=",
-      "https://proxy.cors.sh/"
-    ];
-    
+    // الاستراتيجية 1: محاولة الاتصال المباشر بـ Gemini (بدون بروكسي أولاً)
+    try {
+      console.log("AI ATTEMPT (Gemini Direct)...");
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني مصري خبير. اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}` }] }] })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (result) {
+          setText(result);
+          showToast("تم التوليد بنجاح (Direct Gemini)", "success");
+          setLoading(false);
+          return;
+        }
+      } else {
+        errorLog += `Gemini Direct Fail: ${response.status}\n`;
+      }
+    } catch (e: any) { errorLog += `Gemini Direct Catch: ${e.message}\n`; }
+
+    // الاستراتيجية 2: محاولة البروكسيات لـ Gemini
+    const proxies = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
     for (const proxy of proxies) {
       try {
         const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const finalUrl = proxy + encodeURIComponent(targetUrl);
-        
         const response = await fetch(finalUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `أنت مساعد قانوني مصري خبير. اكتب ${selectedTag} قانوني دقيق بناءً على: ${prompt}` }] }]
-          })
+          body: JSON.stringify({ contents: [{ parts: [{ text: `أنت مساعد قانوني مصري خبير. اكتب ${selectedTag}: ${prompt}` }] }] })
         });
-
         if (response.ok) {
           const data = await response.json();
           const result = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (result) {
             setText(result);
-            showToast("تم التوليد بنجاح (Gemini Proxy)", "success");
+            showToast("تم التوليد بنجاح (Proxy Gemini)", "success");
             setLoading(false);
             return;
           }
         } else {
-          const err = await response.text();
           errorLog += `Gemini Proxy Fail: ${response.status}\n`;
         }
-      } catch (e: any) { 
-        errorLog += `Gemini Proxy Catch: ${e.message}\n`;
-        continue; 
-      }
+      } catch (e: any) { errorLog += `Gemini Proxy Catch: ${e.message}\n`; }
     }
 
-    // الاستراتيجية 2: محاولة OpenRouter مع موديلات "مجانية" و "قوية" لضمان العمل 100%
-    // الموديلات المجانية (Free Models) غالباً ما تكون أكثر استقراراً في المناطق المحظورة
+    // الاستراتيجية 3: محاولة OpenRouter مع موديلات مجانية ومستقرة
     const openRouterModels = [
+      "google/gemini-2.0-flash-exp:free",
       "google/gemini-flash-1.5", 
-      "google/gemini-2.0-flash-exp:free", // موديل مجاني حديث
-      "mistralai/mistral-7b-instruct:free", // موديل مجاني فرنسي
-      "meta-llama/llama-3-8b-instruct:free", // موديل مجاني من ميتا
-      "qwen/qwen-2-7b-instruct:free" // موديل مجاني صيني (لا يفرض أي قيود)
+      "mistralai/mistral-7b-instruct:free",
+      "meta-llama/llama-3-8b-instruct:free",
+      "deepseek/deepseek-chat:free"
     ];
 
     for (const model of openRouterModels) {
       try {
-        console.log(`AI ATTEMPT (OpenRouter Model: ${model})...`);
+        console.log(`AI ATTEMPT (OpenRouter: ${model})...`);
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${OPENROUTER_KEY}`,
+            "Authorization": `Bearer ${orKey}`,
             "HTTP-Referer": window.location.origin,
             "X-Title": "Lawyer App Egypt",
             "Content-Type": "application/json"
@@ -2572,23 +2583,19 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
           }
         } else {
           const err = await response.json();
-          errorLog += `OR ${model} Fail: ${response.status} - ${err.error?.message}\n`;
+          errorLog += `OR ${model} Fail: ${response.status} - ${err.error?.message || "Unauthorized"}\n`;
         }
-      } catch (e: any) { 
-        errorLog += `OR ${model} Catch: ${e.message}\n`;
-        continue; 
-      }
+      } catch (e: any) { errorLog += `OR ${model} Catch: ${e.message}\n`; }
     }
 
     setLoading(false);
     console.error("FULL AI ERROR LOG:", errorLog);
-    showToast("فشل التوليد بكافة الطرق. يرجى مراجعة اتصال الإنترنت.", "error");
     
-    // إظهار تنبيه يشرح السبب الحقيقي إذا كان هناك خطأ محدد
     if (errorLog.includes("401") || errorLog.includes("403")) {
-      alert("خطأ تقني: يبدو أن هناك مشكلة في صلاحية المفاتيح حالياً. يرجى إبلاغ الدعم الفني بكود الخطأ 401.");
+      showToast("خطأ: مفاتيح الذكاء الاصطناعي تحتاج لتحديث.", "error");
+      alert("تنبيه أمني: يبدو أن المفاتيح (Gemini/OpenRouter) قد انتهت صلاحيتها أو تم تعطيلها. يرجى الدخول للوحة التحكم وتحديث المفاتيح بمفاتيح جديدة من موقع Google AI Studio أو OpenRouter.ai لضمان استمرارية الخدمة.");
     } else {
-      alert("عذراً، يبدو أن هناك حظر تقني شامل على منطقتك أو مزود الإنترنت لديك يمنع الوصول لكافة محركات الذكاء الاصطناعي (جوجل، ميتا، ميسترال). يرجى تجربة شبكة إنترنت مختلفة (بيانات الهاتف بدلاً من الواي فاي) أو استخدام متصفح خفي.");
+      showToast("فشل التوليد بكافة الطرق. يرجى مراجعة اتصال الإنترنت.", "error");
     }
   };
 
@@ -2920,12 +2927,18 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
   const [editingUser, setEditingUser] = useState<any | null>(null);
   
   const [geminiKey, setGeminiKey] = useState(data.geminiApiKey || '');
+  const [openRouterKey, setOpenRouterKey] = useState(data.openRouterApiKey || '');
   const [supabaseUrl, setSupabaseUrl] = useState(data.supabaseUrl || '');
   const [supabaseKey, setSupabaseKey] = useState(data.supabaseKey || '');
 
   const saveGeminiKey = async () => {
     await updateData({ geminiApiKey: geminiKey });
-    showToast('تم حفظ مفتاح الذكاء الاصطناعي بنجاح', 'success');
+    showToast('تم حفظ مفتاح Gemini بنجاح', 'success');
+  };
+
+  const saveOpenRouterKey = async () => {
+    await updateData({ openRouterApiKey: openRouterKey });
+    showToast('تم حفظ مفتاح OpenRouter بنجاح', 'success');
   };
 
   const saveSupabaseConfig = async () => {
@@ -3157,6 +3170,17 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
               >
                 استعادة المفتاح الافتراضي (الموصى به)
               </button>
+              
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center gap-2 text-slate-500">
+                  <Globe className="w-4 h-4" />
+                  <span className="text-xs font-bold text-slate-700">مفتاح OpenRouter (للمناطق المحظورة)</span>
+                </div>
+                <div className="flex gap-2">
+                  <input type="password" value={openRouterKey} onChange={e => setOpenRouterKey(e.target.value)} placeholder="أدخل OpenRouter API Key هنا..." className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                  <button onClick={saveOpenRouterKey} className="bg-slate-800 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-slate-900 transition-colors text-xs">حفظ</button>
+                </div>
+              </div>
             </div>
             <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
               <div className="flex items-center gap-3 text-blue-600 mb-2">
