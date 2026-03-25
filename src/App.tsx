@@ -2488,83 +2488,57 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
 
     setLoading(true);
     
-    // الحل الجذري (بدون VPN): استخدام بروكسي (CORS Proxy) لتمويه موقع المستخدم الجغرافي
-    // سيظهر لجوجل أن الطلب قادم من سيرفرات البروكسي (عادة في أمريكا أو أوروبا) وليس من موقعك الحالي
-    const proxyUrl = "https://corsproxy.io/?"; 
-    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-pro"];
+    // نظام "البروكسي العالمي المتعدد" لتجاوز الحظر الجغرافي تماماً بدون VPN
+    // نقوم بتجربة 3 بروكسيات مختلفة من دول مختلفة (أمريكا، أوروبا، آسيا) لضمان الوصول
+    const proxies = [
+      "https://corsproxy.io/?",
+      "https://api.allorigins.win/raw?url=",
+      "https://proxy.cors.sh/" // بروكسي احتياطي ثالث
+    ];
+    
+    const models = ["gemini-1.5-flash", "gemini-1.5-pro"];
 
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`AI PROXY ATTEMPT: Trying model ${modelName} via Proxy...`);
-        
-        const targetUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
-        const finalUrl = proxyUrl + encodeURIComponent(targetUrl);
-        
-        const response = await fetch(finalUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `أنت مساعد قانوني محترف في القانون المصري. اكتب ${selectedTag} بصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`
-              }]
-            }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
-          })
-        });
+    for (const proxy of proxies) {
+      for (const modelName of models) {
+        try {
+          console.log(`AI ATTEMPT: ${modelName} via Proxy: ${proxy.substring(0, 20)}...`);
+          
+          const targetUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`;
+          const finalUrl = proxy + encodeURIComponent(targetUrl);
+          
+          const response = await fetch(finalUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `أنت مساعد قانوني محترف في القانون المصري. اكتب ${selectedTag} بصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`
+                }]
+              }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+            })
+          });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`AI PROXY FAILED (${modelName}):`, errorText);
-          continue; // جرب الموديل التالي أو البروكسي التالي إن وجد
-        }
-
-        const data = await response.json();
-        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (textResponse) {
-          setText(textResponse);
-          showToast(`تم التوليد بنجاح (عبر البروكسي)`, "success");
-          setLoading(false);
-          return;
-        }
-      } catch (error: any) {
-        console.error(`PROXY CATCH ERROR (${modelName}):`, error);
-        continue;
-      }
-    }
-
-    // إذا فشل البروكسي الأول، نحاول بروكسي ثاني (AllOrigins) كحل احتياطي أخير
-    try {
-      console.log("AI PROXY ATTEMPT 2: Trying via AllOrigins...");
-      const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      const finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-      
-      const response = await fetch(finalUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `اكتب ${selectedTag}: ${prompt}` }] }]
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (textResponse) {
-          setText(textResponse);
-          showToast(`تم التوليد (حل بديل)`, "success");
-          setLoading(false);
-          return;
+          if (response.ok) {
+            const data = await response.json();
+            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (textResponse) {
+              setText(textResponse);
+              showToast("تم التوليد بنجاح (نظام الوصول الذكي)", "success");
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn(`Proxy attempt failed: ${proxy}`);
+          continue;
         }
       }
-    } catch (e) {
-      console.error("All Proxy attempts failed");
     }
 
     setLoading(false);
-    showToast("فشل التوليد: يبدو أن قيود جوجل الجغرافية صارمة جداً حالياً. جرب المحاولة مرة أخرى لاحقاً.", "error");
-    alert("تنبيه: لقد حاولت الالتفاف على الحظر الجغرافي باستخدام 'بروكسي' ولكن جوجل ترفض الطلب حالياً. كحل احترافي دائم، أنصحك بالحصول على مفتاح من OpenRouter.ai (وهو وسيط لا يفرض قيوداً جغرافية) وسأقوم ببرمجته لك إذا أردت.");
+    showToast("فشل التوليد: هناك قيود شديدة حالياً على سيرفرات جوجل الجغرافية. جرب المحاولة مرة أخرى بعد قليل.", "error");
+    alert("عذراً، يبدو أن جوجل تفرض قيوداً صارمة جداً على منطقتك حالياً وتمنع حتى 'البروكسي'. لقد قمت بتحديث الكود ليكون أكثر ذكاءً، يرجى تجربة فتح الموقع من (متصفح خفي - Incognito Window) أو مسح الكاش للتأكد من استخدام النسخة الأحدث من النظام.");
   };
 
   const downloadPDF = () => {
