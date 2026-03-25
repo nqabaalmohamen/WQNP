@@ -2490,6 +2490,7 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     let apiKey = (db.geminiApiKey && db.geminiApiKey !== "MY_GEMINI_API_KEY") ? db.geminiApiKey.trim() : GEMINI_KEY;
 
     setLoading(true);
+    let errorLog = "";
     
     // الاستراتيجية 1: محاولة الاتصال المباشر والمحمي (Proxies) لـ Gemini
     const proxies = [
@@ -2500,7 +2501,6 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
     
     for (const proxy of proxies) {
       try {
-        console.log(`AI ATTEMPT (Gemini via Proxy: ${proxy.substring(0, 15)})...`);
         const targetUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
         const finalUrl = proxy + encodeURIComponent(targetUrl);
         
@@ -2521,15 +2521,24 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
             setLoading(false);
             return;
           }
+        } else {
+          const err = await response.text();
+          errorLog += `Gemini Proxy Fail: ${response.status}\n`;
         }
-      } catch (e) { continue; }
+      } catch (e: any) { 
+        errorLog += `Gemini Proxy Catch: ${e.message}\n`;
+        continue; 
+      }
     }
 
-    // الاستراتيجية 2: محاولة OpenRouter مع عدة موديلات لضمان العمل 100%
+    // الاستراتيجية 2: محاولة OpenRouter مع موديلات "مجانية" و "قوية" لضمان العمل 100%
+    // الموديلات المجانية (Free Models) غالباً ما تكون أكثر استقراراً في المناطق المحظورة
     const openRouterModels = [
       "google/gemini-flash-1.5", 
-      "mistralai/mistral-7b-instruct", 
-      "meta-llama/llama-3-8b-instruct"
+      "google/gemini-2.0-flash-exp:free", // موديل مجاني حديث
+      "mistralai/mistral-7b-instruct:free", // موديل مجاني فرنسي
+      "meta-llama/llama-3-8b-instruct:free", // موديل مجاني من ميتا
+      "qwen/qwen-2-7b-instruct:free" // موديل مجاني صيني (لا يفرض أي قيود)
     ];
 
     for (const model of openRouterModels) {
@@ -2561,16 +2570,26 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
             setLoading(false);
             return;
           }
+        } else {
+          const err = await response.json();
+          errorLog += `OR ${model} Fail: ${response.status} - ${err.error?.message}\n`;
         }
-      } catch (e) { 
-        console.error(`OpenRouter fallback failed for model ${model}`, e);
+      } catch (e: any) { 
+        errorLog += `OR ${model} Catch: ${e.message}\n`;
         continue; 
       }
     }
 
     setLoading(false);
+    console.error("FULL AI ERROR LOG:", errorLog);
     showToast("فشل التوليد بكافة الطرق. يرجى مراجعة اتصال الإنترنت.", "error");
-    alert("لقد جربت كافة الحلول البرمجية (Gemini Proxies, OpenRouter Gemini, Mistral, Llama). إذا استمر الفشل، فهذا يعني أن هناك مشكلة في استقرار الشبكة لديك أو أن مزودي الخدمة يواجهون عطلاً مؤقتاً. يرجى تجربة فتح الموقع من جهاز آخر أو شبكة أخرى للتأكد.");
+    
+    // إظهار تنبيه يشرح السبب الحقيقي إذا كان هناك خطأ محدد
+    if (errorLog.includes("401") || errorLog.includes("403")) {
+      alert("خطأ تقني: يبدو أن هناك مشكلة في صلاحية المفاتيح حالياً. يرجى إبلاغ الدعم الفني بكود الخطأ 401.");
+    } else {
+      alert("عذراً، يبدو أن هناك حظر تقني شامل على منطقتك أو مزود الإنترنت لديك يمنع الوصول لكافة محركات الذكاء الاصطناعي (جوجل، ميتا، ميسترال). يرجى تجربة شبكة إنترنت مختلفة (بيانات الهاتف بدلاً من الواي فاي) أو استخدام متصفح خفي.");
+    }
   };
 
   const downloadPDF = () => {
