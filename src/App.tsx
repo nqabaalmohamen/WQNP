@@ -962,7 +962,7 @@ const PlaceholderScreen = ({ title, onBack, description }: { title: string, onBa
 
 // --- Screens ---
 
-const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, notificationsCount?: number }) => {
+const HomeScreen = ({ onMenu, showToast, notificationsCount = 0 }: { onMenu: () => void, showToast: (m: string, t?: any) => void, notificationsCount?: number }) => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -1136,7 +1136,7 @@ const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, no
 
 };
 
-const MyOfficeScreen = ({ onBack, cases, clients, tasks, sessions, reminders }: { onBack: () => void, cases: Case[], clients: Client[], tasks: Task[], sessions: Session[], reminders: Reminder[] }) => {
+const MyOfficeScreen = ({ onBack, showToast, cases, clients, tasks, sessions, reminders }: { onBack: () => void, showToast: (m: string, t?: any) => void, cases: Case[], clients: Client[], tasks: Task[], sessions: Session[], reminders: Reminder[] }) => {
   const navigate = useNavigate();
   return (
     <div className="pb-24">
@@ -3858,10 +3858,10 @@ export default function App() {
             <Route path="/login" element={<LoginScreen onLogin={handleLogin} showToast={showToast} />} />
             <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/login')} showToast={showToast} />} />
             
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
+            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={(data.users.find((u:any)=>u.phone===user?.phone)?.notifications?.length || 0) + (data.reminders?.length || 0)} /> : <Navigate to="/login" />} />
             <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
+            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data.cases || []} clients={data.clients || []} tasks={data.tasks || []} sessions={data.sessions || []} reminders={data.reminders || []} /> : <Navigate to="/login" />} />
             <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
             <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/login" />} />
             <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/login" />} />
