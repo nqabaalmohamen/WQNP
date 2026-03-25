@@ -1020,7 +1020,11 @@ const HomeScreen = ({ onMenu, notificationsCount = 0 }: { onMenu: () => void, no
                   <button
                     key={service.id}
                     onClick={() => {
-                      navigate(service.id);
+                      if (service.id === '/writing') {
+                        showToast('هذه الخدمة ستكون متاحة قريباً جداً لخدمة السادة المحامين بالفيوم', 'info');
+                      } else {
+                        navigate(service.id);
+                      }
                       setSearchQuery('');
                     }}
                     className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-none text-right"
@@ -1164,7 +1168,7 @@ const MyOfficeScreen = ({ onBack, cases, clients, tasks, sessions, reminders }: 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <ActionCard icon={ShieldCheck} title="الأعمال الإدارية" subtitle={`${tasks.filter(t=>!t.completed).length} مهام قائمة`} color="bg-green-600" onClick={() => navigate('/tasks')} />
             <ActionCard icon={FileText} title="المحضرين" subtitle="إدارة المحضرين والإجراءات" color="bg-green-500" onClick={() => navigate('/bailiffs')} />
-            <ActionCard icon={PenTool} title="الأعمال الكتابية" subtitle="كتابة العرائض والمذكرات" color="bg-green-400" onClick={() => navigate('/writing')} />
+            <ActionCard icon={PenTool} title="الأعمال الكتابية" subtitle="كتابة العرائض والمذكرات" color="bg-green-400" onClick={() => showToast('هذه الخدمة ستكون متاحة قريباً جداً لخدمة السادة المحامين بالفيوم', 'info')} />
           </div>
         </div>
       </div>
