@@ -62,7 +62,48 @@ import { ar } from 'date-fns/locale';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-const BUILD_DATE = "2026-03-25 01:10 PM"; // توقيع زمني للتحديث المباشر
+// --- Error Boundary for White Screen Protection ---
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Critical Render Error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white" dir="rtl">
+          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mb-6 border border-red-500/30">
+            <AlertCircle className="w-12 h-12 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold mb-4">حدث خطأ غير متوقع في النظام</h2>
+          <p className="text-slate-400 mb-8 max-w-md leading-relaxed">نعتذر عن هذا العطل الفني. يرجى محاولة إعادة تحميل الصفحة، وإذا استمرت المشكلة قم بتسجيل الخروج والمحاولة مرة أخرى.</p>
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="flex-1 bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Globe className="w-5 h-5" />
+              إعادة تحميل الصفحة
+            </button>
+            <button 
+              onClick={() => { localStorage.clear(); window.location.href = '/'; }} 
+              className="flex-1 bg-slate-800 text-white px-8 py-4 rounded-2xl font-bold hover:bg-slate-700 transition-all"
+            >
+              تسجيل الخروج (Reset)
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const BUILD_DATE = "2026-03-25 02:30 PM"; // تحديث شامل لحل مشكلة الشاشة البيضاء
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -3546,7 +3587,22 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (error) {
+      console.error("Failed to parse user data from localStorage", error);
+      localStorage.removeItem('user');
+      return null;
+    }
+  });
+
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    const isLog = localStorage.getItem('isLoggedIn') === 'true';
+    if (!savedUser || !isLog) return false;
+
     const sessionStart = localStorage.getItem('sessionStart');
     if (sessionStart) {
       const fiveDays = 5 * 24 * 60 * 60 * 1000;
@@ -3557,17 +3613,7 @@ export default function App() {
         return false;
       }
     }
-    return localStorage.getItem('isLoggedIn') === 'true';
-  });
-  const [user, setUser] = useState<any>(() => {
-    try {
-      const savedUser = localStorage.getItem('user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch (error) {
-      console.error("Failed to parse user data from localStorage", error);
-      localStorage.removeItem('user');
-      return null;
-    }
+    return true;
   });
 
   // Check session expiry periodically
@@ -3584,6 +3630,7 @@ export default function App() {
     const interval = setInterval(checkExpiry, 60000); // Check every minute
     return () => clearInterval(interval);
   }, [isLoggedIn]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
@@ -3592,10 +3639,10 @@ export default function App() {
   // Load data from Supabase on mount
   useEffect(() => {
     const initApp = async () => {
-      if (!navigator.onLine) {
-        return;
-      }
       try {
+        if (!navigator.onLine) {
+          return;
+        }
         const cloudData = await loadFromSupabase();
         if (cloudData) setData(cloudData);
       } catch (e) {
@@ -3621,10 +3668,14 @@ export default function App() {
 
   // Helper to update and sync data
   const updateData = async (updates: any) => {
-    const newData = { ...data, ...updates };
-    setData(newData);
-    saveLocalDB(newData);
-    await syncToSupabase(newData);
+    try {
+      const newData = { ...(data || {}), ...updates };
+      setData(newData);
+      saveLocalDB(newData);
+      await syncToSupabase(newData);
+    } catch (e) {
+      console.error("Update data error:", e);
+    }
   };
 
   const logEvent = async (type: string, message: string, severity: 'normal' | 'warning' | 'critical' = 'normal') => {
@@ -3637,13 +3688,9 @@ export default function App() {
       userName: user?.name || 'غير معروف',
       userPhone: user?.phone || 'غير معروف'
     };
-    const updatedEvents = [event, ...(data.systemEvents || [])].slice(0, 100); // Keep last 100 events
-    await updateData({ systemEvents: updatedEvents });
+    const currentEvents = Array.isArray(data?.systemEvents) ? data.systemEvents : [];
+    await updateData({ systemEvents: [event, ...currentEvents].slice(0, 100) });
   };
-
-  if (!isOnline) {
-    return <OfflineOverlay />;
-  }
 
   if (showSplash) {
     return <SplashIntro onComplete={() => setShowSplash(false)} />;
@@ -3651,19 +3698,19 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-        <p className="text-gray-500 font-bold">جاري مزامنة البيانات السحابية...</p>
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center gap-4 text-white">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+        <p className="text-slate-400 font-bold">جاري تحميل المنصة...</p>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <XCircle className="w-16 h-16 text-red-500 mb-4 mx-auto" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">فشل تحميل البيانات</h1>
-        <p className="text-gray-500 mb-6">لا يمكن تشغيل النظام بدون الوصول إلى البيانات السحابية.</p>
+        <h1 className="text-2xl font-bold mb-2">فشل تحميل البيانات</h1>
+        <p className="text-slate-400 mb-6">لا يمكن تشغيل النظام بدون الوصول إلى البيانات. يرجى التأكد من الإنترنت.</p>
         <button 
           onClick={() => window.location.reload()}
           className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg"
@@ -3675,61 +3722,78 @@ export default function App() {
   }
 
   const handleLogin = async (userData: any) => {
-    setUser(userData);
-    setIsLoggedIn(true);
-    localStorage.setItem('isLoggedIn', 'true');
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('sessionStart', Date.now().toString());
+    try {
+      if (!userData || !userData.phone) {
+        throw new Error("بيانات المستخدم غير صالحة");
+      }
+      
+      setUser(userData);
+      setIsLoggedIn(true);
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('sessionStart', Date.now().toString());
 
-    // تحديث الجلسات النشطة
-    const session = {
-      phone: userData.phone,
-      userName: userData.name,
-      loginTime: new Date().toISOString(),
-      lastActive: new Date().toISOString()
-    };
-    const otherSessions = (data.activeSessions || []).filter((s: any) => s.phone !== userData.phone);
-    const updatedSessions = [session, ...otherSessions];
-    
-    // تسجيل الحدث وتحديث الجلسات
-    const event = {
-      id: Date.now().toString(),
-      type: 'دخول',
-      message: `قام المستخدم ${userData.name} بتسجيل الدخول`,
-      severity: 'normal',
-      timestamp: new Date().toISOString(),
-      userName: userData.name,
-      userPhone: userData.phone
-    };
-    
-    await updateData({ 
-      activeSessions: updatedSessions,
-      systemEvents: [event, ...(data.systemEvents || [])].slice(0, 100)
-    });
+      // تحديث الجلسات النشطة بأمان
+      const currentSessions = Array.isArray(data?.activeSessions) ? data.activeSessions : [];
+      const session = {
+        phone: userData.phone,
+        userName: userData.name || 'مستخدم',
+        loginTime: new Date().toISOString(),
+        lastActive: new Date().toISOString()
+      };
+      const otherSessions = currentSessions.filter((s: any) => s && s.phone !== userData.phone);
+      const updatedSessions = [session, ...otherSessions];
+      
+      // سجل الحدث بأمان
+      const currentEvents = Array.isArray(data?.systemEvents) ? data.systemEvents : [];
+      const event = {
+        id: Date.now().toString(),
+        type: 'دخول',
+        message: `قام المستخدم ${userData.name || userData.phone} بتسجيل الدخول`,
+        severity: 'normal',
+        timestamp: new Date().toISOString(),
+        userName: userData.name || 'مستخدم',
+        userPhone: userData.phone
+      };
+      
+      await updateData({ 
+        activeSessions: updatedSessions,
+        systemEvents: [event, ...currentEvents].slice(0, 100)
+      });
 
-    if (userData.role === 'admin') {
-      navigate('/admin');
-    } else {
-      navigate('/home');
+      if (userData.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/home');
+      }
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      showToast(error.message || 'حدث خطأ أثناء تسجيل الدخول', 'error');
     }
   };
 
   const logout = async () => {
-    if (user) {
-      const updatedSessions = (data.activeSessions || []).filter((s: any) => s.phone !== user.phone);
-      const event = {
-        id: Date.now().toString(),
-        type: 'خروج',
-        message: `قام المستخدم ${user.name} بتسجيل الخروج`,
-        severity: 'normal',
-        timestamp: new Date().toISOString(),
-        userName: user.name,
-        userPhone: user.phone
-      };
-      await updateData({ 
-        activeSessions: updatedSessions,
-        systemEvents: [event, ...(data.systemEvents || [])].slice(0, 100)
-      });
+    try {
+      if (user) {
+        const currentSessions = Array.isArray(data?.activeSessions) ? data.activeSessions : [];
+        const updatedSessions = currentSessions.filter((s: any) => s && s.phone !== user.phone);
+        const currentEvents = Array.isArray(data?.systemEvents) ? data.systemEvents : [];
+        const event = {
+          id: Date.now().toString(),
+          type: 'خروج',
+          message: `قام المستخدم ${user.name} بتسجيل الخروج`,
+          severity: 'normal',
+          timestamp: new Date().toISOString(),
+          userName: user.name,
+          userPhone: user.phone
+        };
+        await updateData({ 
+          activeSessions: updatedSessions,
+          systemEvents: [event, ...currentEvents].slice(0, 100)
+        });
+      }
+    } catch (e) {
+      console.error("Logout sync error:", e);
     }
 
     setIsLoggedIn(false);
@@ -3737,7 +3801,7 @@ export default function App() {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('user');
     localStorage.removeItem('sessionStart');
-    navigate('/login');
+    navigate('/');
     showToast('تم تسجيل الخروج بنجاح', 'success');
   };
 
@@ -3789,67 +3853,77 @@ export default function App() {
     logEvent('حذف مهمة', `تم حذف مهمة: ${t?.title || id}`, 'normal');
   });
 
-  const isAuthPage = location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup';
+  const isAuthPage = location.pathname === '/' || location.pathname === '/signup';
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-right" dir="rtl">
-      {!hasCloudDB && !isAuthPage && (
-        <div className="bg-red-600 text-white text-[10px] py-1.5 px-4 text-center font-bold sticky top-0 z-[60] animate-pulse">
-          تحذير: البيانات مخزنة محلياً فقط. اربط قاعدة البيانات السحابية (Supabase) من الإعدادات لضمان المزامنة والأمان.
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-50 font-sans text-right" dir="rtl">
+        {!isOnline && (
+          <div className="bg-amber-600 text-white text-[10px] py-1 px-4 text-center font-bold sticky top-0 z-[100] flex items-center justify-center gap-2">
+            <Globe className="w-3 h-3 animate-pulse" />
+            أنت تعمل الآن في وضع عدم الاتصال. سيتم مزامنة البيانات عند عودة الإنترنت.
+          </div>
+        )}
+        {!hasCloudDB && !isAuthPage && (
+          <div className="bg-red-600 text-white text-[10px] py-1.5 px-4 text-center font-bold sticky top-0 z-[60] animate-pulse">
+            تحذير: البيانات مخزنة محلياً فقط. اربط قاعدة البيانات السحابية (Supabase) من الإعدادات لضمان المزامنة والأمان.
+          </div>
+        )}
+        <div className="max-w-7xl mx-auto bg-white min-h-screen shadow-2xl relative flex flex-col">
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+          <AnimatePresence>
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+          </AnimatePresence>
+
+          <ConfirmModal 
+            isOpen={!!confirmModal} 
+            title={confirmModal?.title || ''} 
+            message={confirmModal?.message || ''} 
+            onConfirm={confirmModal?.onConfirm || (() => {})} 
+            onCancel={() => setConfirmModal(null)} 
+          />
+
+          <main className="flex-1">
+            <Routes>
+              <Route path="/" element={isLoggedIn ? <Navigate to="/home" /> : <LoginScreen onLogin={handleLogin} showToast={showToast} />} />
+              <Route path="/login" element={<Navigate to="/" />} />
+              <Route path="/signup" element={isLoggedIn ? <Navigate to="/home" /> : <SignupScreen onSignup={() => navigate('/')} showToast={showToast} />} />
+              
+              <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={user ? (((data?.users?.find((u:any)=>u?.phone===user?.phone)?.notifications?.length) || 0) + (data?.reminders?.length || 0)) : 0} /> : <Navigate to="/" />} />
+              <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
+              
+              <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data?.cases || []} clients={data?.clients || []} tasks={data?.tasks || []} sessions={data?.sessions || []} reminders={data?.reminders || []} /> : <Navigate to="/" />} />
+              <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
+              <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              
+              <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/" />} />
+              <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/" />} />
+              <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/" />} />
+              <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/" />} />
+              <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/" />} />
+              <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/" />} />
+              
+              <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={user ? (data?.users?.find((u:any)=>u?.phone===user?.phone)?.notifications || []) : []} reminders={data?.reminders || []} onDelete={async (id) => {
+                if (!user) return;
+                const updatedUsers = (data?.users || []).map((u: any) => u?.phone === user?.phone ? { ...u, notifications: (u.notifications || []).filter((n: any) => n.id !== id) } : u);
+                await updateData({ users: updatedUsers });
+                showToast('تم حذف الإشعار', 'success');
+              }} /> : <Navigate to="/" />} />
+              
+              <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </main>
+
+          <BottomNav />
         </div>
-      )}
-      <div className="max-w-7xl mx-auto bg-white min-h-screen shadow-2xl relative flex flex-col">
-        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-
-        <AnimatePresence>
-          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        </AnimatePresence>
-
-        <ConfirmModal 
-          isOpen={!!confirmModal} 
-          title={confirmModal?.title || ''} 
-          message={confirmModal?.message || ''} 
-          onConfirm={confirmModal?.onConfirm || (() => {})} 
-          onCancel={() => setConfirmModal(null)} 
-        />
-
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={isLoggedIn ? <Navigate to="/home" /> : <LoginScreen onLogin={handleLogin} showToast={showToast} />} />
-            <Route path="/login" element={<Navigate to="/" />} />
-            <Route path="/signup" element={<SignupScreen onSignup={() => navigate('/')} showToast={showToast} />} />
-            
-            <Route path="/home" element={isLoggedIn ? <HomeScreen onMenu={() => setIsSidebarOpen(true)} showToast={showToast} notificationsCount={((data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications?.length) || 0) + (data?.reminders?.length || 0)} /> : <Navigate to="/" />} />
-            <Route path="/admin" element={isLoggedIn && user?.role === 'admin' ? <AdminDashboard data={data} updateData={updateData} onBack={logout} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
-            
-            <Route path="/my-office" element={isLoggedIn ? <MyOfficeScreen onBack={() => navigate(-1)} showToast={showToast} cases={data?.cases || []} clients={data?.clients || []} tasks={data?.tasks || []} sessions={data?.sessions || []} reminders={data?.reminders || []} /> : <Navigate to="/" />} />
-            <Route path="/community" element={isLoggedIn ? <CommunityScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-            <Route path="/library" element={isLoggedIn ? <LibraryScreen onBack={() => navigate(-1)} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
-            <Route path="/bulletin" element={isLoggedIn ? <BulletinScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-            <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-            
-            <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/" />} />
-            <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/" />} />
-            <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/" />} />
-            <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/" />} />
-            <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/" />} />
-            <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/" />} />
-            
-            <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={data?.users?.find((u:any)=>u.phone===user?.phone)?.notifications || []} reminders={data?.reminders || []} onDelete={async (id) => {
-              const updatedUsers = data.users.map((u: any) => u.phone === user.phone ? { ...u, notifications: u.notifications.filter((n: any) => n.id !== id) } : u);
-              await updateData({ users: updatedUsers });
-              showToast('تم حذف الإشعار', 'success');
-            }} /> : <Navigate to="/" />} />
-            
-            <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
-            <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-            <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-            <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
-          </Routes>
-        </main>
-
-        {isLoggedIn && !isLandingPage && !isAuthPage && <BottomNav />}
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
