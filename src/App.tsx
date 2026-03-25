@@ -41,7 +41,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  X
+  X,
+  Fingerprint
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
@@ -2669,6 +2670,63 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [hasBiometricUser, setHasBiometricUser] = useState(false);
+
+  useEffect(() => {
+    const checkBiometrics = async () => {
+      const isAvailable = !!window.PublicKeyCredential && 
+                          await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      setIsBiometricSupported(isAvailable);
+      setHasBiometricUser(!!localStorage.getItem('biometric_user'));
+    };
+    checkBiometrics();
+  }, []);
+
+  const handleBiometricLogin = async () => {
+    try {
+      const savedPhone = localStorage.getItem('biometric_user');
+      if (!savedPhone) return;
+
+      // طلب المصادقة من الجهاز
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const options: any = {
+        publicKey: {
+          challenge,
+          timeout: 60000,
+          userVerification: "required",
+          allowCredentials: []
+        }
+      };
+
+      // ملاحظة: في الويب الحقيقي نحتاج لإعدادات أكثر تعقيداً، 
+      // ولكن هنا نستخدم بصمة الجهاز للتحقق المحلي فقط لتسريع الدخول
+      const credential = await navigator.credentials.get(options);
+      
+      if (credential) {
+        setIsLoggingIn(true);
+        // محاكاة تسجيل الدخول باستخدام البيانات المحفوظة محلياً والموثقة بالبصمة
+        const currentDb = await loadFromSupabase();
+        const user = currentDb.users.find((u: any) => u.phone === savedPhone);
+        
+        if (user) {
+          showToast('تم التحقق عبر البصمة بنجاح', 'success');
+          onLogin(user);
+        } else {
+          showToast('فشل التحقق من بيانات المستخدم', 'error');
+        }
+      }
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        console.error('Biometric Error:', error);
+        showToast('حدث خطأ أثناء المصادقة الحيوية', 'error');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!phone || !password) return showToast('يرجى إدخال رقم الهاتف وكلمة المرور', 'error');
@@ -2688,6 +2746,12 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
       }
 
       if (response.ok) {
+        // بعد نجاح الدخول، نسأل المستخدم إذا كان يريد تفعيل البصمة
+        if (isBiometricSupported && localStorage.getItem('biometric_user') !== phone) {
+          if (confirm('هل تريد تفعيل الدخول بالبصمة لهذا الجهاز مستقبلاً؟')) {
+            localStorage.setItem('biometric_user', phone);
+          }
+        }
         onLogin(data.user);
       } else {
         console.error('Login failed:', response.status, data);
@@ -2775,6 +2839,17 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
           >
             {isLoggingIn ? 'جاري الدخول...' : 'دخول'}
           </button>
+
+          {isBiometricSupported && hasBiometricUser && (
+            <button 
+              onClick={handleBiometricLogin}
+              disabled={isLoggingIn}
+              className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold border border-slate-700 cursor-pointer hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Fingerprint className="w-5 h-5 text-blue-500" />
+              الدخول ببصمة الهاتف
+            </button>
+          )}
         </div>
 
         <p className="text-center text-slate-500 text-sm">
