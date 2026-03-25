@@ -2482,51 +2482,62 @@ const WritingScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (
   const generateWithAI = async () => {
     if (!prompt) return;
     
-    // المفتاح الثابت كحل احتياطي أخير
-    const DEFAULT_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
+    // الحل الجذري: المفتاح الجديد المقدم منك مباشرة
+    const NEW_STABLE_KEY = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
     
     const db = getLocalDB();
-    // نفضل المفتاح الموجود في قاعدة البيانات، ثم المفتاح البيئي، ثم المفتاح الثابت
-    let apiKey = db.geminiApiKey || (import.meta as any).env?.VITE_GEMINI_API_KEY || DEFAULT_KEY;
-
-    // إذا كان المفتاح غير صالح أو placeholder، نستخدم المفتاح الثابت فوراً
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || !apiKey.startsWith("AIza")) {
-      console.warn("Invalid or missing API Key, falling back to default key.");
-      apiKey = DEFAULT_KEY;
+    // نستخدم المفتاح الجديد كأولوية قصوى، وإذا كان المسؤول قد غيره يدوياً لمفتاح آخر صالح نستخدمه
+    let apiKey = db.geminiApiKey;
+    
+    // إذا كان المفتاح في قاعدة البيانات غير صالح أو هو القيمة الافتراضية، نفرض المفتاح المستقر
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY" || !apiKey.startsWith("AIza") || apiKey === "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA") {
+      apiKey = NEW_STABLE_KEY;
     }
+
+    apiKey = apiKey.trim(); // تنظيف أي مسافات زائدة
 
     setLoading(true);
     try {
-      console.log("AI Initialization - Key prefix:", apiKey.substring(0, 7));
+      console.log("Radical AI Init - Key Check:", apiKey.substring(0, 10) + "...");
       
-      // تهيئة صريحة ومباشرة
       const genAI = new GoogleGenAI(apiKey);
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash"
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.7,
+        }
       });
       
-      const promptText = `أنت مساعد قانوني خبير ومحترف. قم بكتابة ${selectedTag} باللغة العربية الفصحى وبصياغة قانونية سليمة بناءً على التفاصيل التالية: ${prompt}`;
+      const promptText = `أنت مساعد قانوني خبير ومحترف في القانون المصري. قم بكتابة ${selectedTag} باللغة العربية الفصحى وبصياغة قانونية رصينة ودقيقة بناءً على التفاصيل التالية: ${prompt}`;
       
       const result = await model.generateContent(promptText);
       const response = await result.response;
       const textResponse = response.text();
       
       if (!textResponse) {
-        throw new Error("لم يتم استلام نص من الذكاء الاصطناعي");
+        throw new Error("Empty Response from AI");
       }
       
       setText(textResponse);
       showToast("تم توليد النص بنجاح", "success");
     } catch (error: any) {
-      console.error("AI Generation Detailed Error:", error);
+      console.error("CRITICAL AI ERROR:", error);
       
-      // معالجة الخطأ الخاص بـ API Key بشكل مفصل
-      const errorMsg = error.message || "";
-      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401")) {
-        showToast("خطأ في صلاحية مفتاح الـ API. يرجى التأكد من المفتاح في إعدادات المسؤول.", "error");
+      let finalErrorMessage = "حدث خطأ غير متوقع في الذكاء الاصطناعي";
+      const errorStr = error.toString();
+      
+      if (errorStr.includes("API_KEY_INVALID") || errorStr.includes("401") || errorStr.includes("403")) {
+        finalErrorMessage = "خطأ في صلاحية المفتاح: يرجى التأكد من تفعيل Gemini API في Google AI Studio";
+      } else if (errorStr.includes("User location is not supported")) {
+        finalErrorMessage = "خطأ: الخدمة غير مدعومة في منطقتك الحالية (جرب استخدام VPN أو مفتاح آخر)";
+      } else if (errorStr.includes("fetch")) {
+        finalErrorMessage = "خطأ في الاتصال: تأكد من جودة الإنترنت لديك";
       } else {
-        showToast("فشل الذكاء الاصطناعي: " + (errorMsg || "تأكد من الاتصال بالإنترنت"), "error");
+        finalErrorMessage = "فشل التوليد: " + (error.message || "يرجى المحاولة مرة أخرى");
       }
+      
+      showToast(finalErrorMessage, "error");
     } finally {
       setLoading(false);
     }
