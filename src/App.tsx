@@ -42,7 +42,20 @@ import {
   AlertCircle,
   Trash2,
   X,
-  Fingerprint
+  Fingerprint,
+  ChevronDown,
+  Facebook,
+  Instagram,
+  Youtube,
+  MessageCircle,
+  Music2,
+  HelpCircle,
+  Lightbulb,
+  Bug,
+  UserCircle2,
+  LogOut,
+  Settings,
+  CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
@@ -3556,95 +3569,299 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-24">
-      <Header title="الملف الشخصي" onBack={onBack} />
-      <div className="p-6 space-y-6">
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center text-center">
-          <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <User className="w-12 h-12 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900">{user?.name || 'محامي'}</h2>
-          <p className="text-gray-500">{user?.role === 'admin' ? 'مدير النظام' : 'محامي مقيد'}</p>
+  const SettingsItem = ({ icon: Icon, title, subtitle, onClick, color = "bg-blue-50", iconColor = "text-blue-600", showArrow = true }: any) => (
+    <button 
+      onClick={onClick}
+      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group"
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110`}>
+          <Icon className={`w-6 h-6 ${iconColor}`} />
         </div>
-
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-500">رقم الهاتف</span>
-              <span className="font-bold text-gray-900">{user?.phone}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-500">رقم القيد</span>
-              <span className="font-bold text-gray-900">{user?.regNo || 'غير متوفر'}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-gray-50">
-              <span className="text-gray-500">حالة الحساب</span>
-              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">نشط</span>
-            </div>
-
-            {!isChangingPassword ? (
-              <button 
-                onClick={() => setIsChangingPassword(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 text-blue-600 font-bold hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
-              >
-                <ShieldCheck className="w-5 h-5" />
-                تغيير كلمة المرور
-              </button>
-            ) : (
-              <div className="space-y-3 pt-2">
-                <input 
-                  type="password" 
-                  placeholder="كلمة المرور القديمة" 
-                  className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-right"
-                  value={oldPassword}
-                  onChange={e => setOldPassword(e.target.value)}
-                />
-                <input 
-                  type="password" 
-                  placeholder="كلمة المرور الجديدة" 
-                  className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-right"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                />
-                <input 
-                  type="password" 
-                  placeholder="تأكيد كلمة المرور الجديدة" 
-                  className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-right"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <button 
-                    onClick={handleChangePassword}
-                    disabled={isLoading}
-                    className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold disabled:opacity-50 cursor-pointer"
-                  >
-                    {isLoading ? 'جاري الحفظ...' : 'حفظ'}
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setIsChangingPassword(false);
-                      setOldPassword('');
-                      setNewPassword('');
-                      setConfirmPassword('');
-                    }}
-                    className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold cursor-pointer"
-                  >
-                    إلغاء
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="text-right">
+          <h4 className="font-bold text-gray-900 text-sm">{title}</h4>
+          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
         </div>
+      </div>
+      {showArrow && <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />}
+    </button>
+  );
 
+  const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = true }: any) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+      <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden mb-4">
         <button 
-          onClick={onLogout}
-          className="w-full bg-red-50 text-red-600 py-4 rounded-2xl font-bold border border-red-100 hover:bg-red-100 transition-colors cursor-pointer"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full p-5 flex items-center justify-between bg-white border-b border-gray-50"
         >
-          تسجيل الخروج
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+              <Icon className="w-5 h-5 text-blue-600" />
+            </div>
+            <span className="font-bold text-gray-900">{title}</span>
+          </div>
+          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </button>
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div 
+              initial={{ height: 0 }}
+              animate={{ height: 'auto' }}
+              exit={{ height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="divide-y divide-gray-50">
+                {children}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col pb-32">
+      {/* Header Profile Section */}
+      <div className="bg-blue-600 pt-12 pb-24 px-6 relative rounded-b-[40px] shadow-lg overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-400/20 rounded-full -ml-32 -mb-32 blur-3xl" />
+        
+        <div className="flex items-center justify-between mb-8 relative z-10">
+          <button onClick={onBack} className="p-2 bg-white/20 rounded-xl backdrop-blur-md text-white">
+            <ChevronRight className="w-6 h-6" />
+          </button>
+          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
+              <Settings className="w-5 h-5 text-white" />
+            </div>
+            الإعدادات
+          </h1>
+          <div className="w-10" />
+        </div>
+
+        <div className="flex items-center gap-6 relative z-10">
+          <div className="relative">
+            <div className="w-24 h-24 bg-white rounded-full p-1 shadow-2xl border-2 border-white/50">
+              <div className="w-full h-full bg-blue-50 rounded-full flex items-center justify-center overflow-hidden">
+                <span className="text-4xl font-black text-blue-600">
+                  {user?.name?.charAt(0).toUpperCase() || 'M'}
+                </span>
+              </div>
+            </div>
+            <div className="absolute bottom-1 right-1 w-8 h-8 bg-green-500 rounded-full border-4 border-blue-600 flex items-center justify-center shadow-lg">
+              <CheckCircle2 className="w-4 h-4 text-white" />
+            </div>
+          </div>
+          
+          <div className="flex-1 space-y-2">
+            <h2 className="text-3xl font-black text-white leading-tight">{user?.name || 'mohamed gmal'}</h2>
+            <div className="flex items-center gap-2">
+              <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/10">
+                <Briefcase className="w-3.5 h-3.5 text-blue-100" />
+                <span className="text-xs font-bold text-white">{user?.role === 'admin' ? 'مدير النظام' : 'محامي معتمد'}</span>
+              </div>
+              <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 border border-white/10">
+                <span className="text-xs font-bold text-white">مدير المكتب</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 -mt-10 relative z-20 space-y-4">
+        {/* Switch Account Section */}
+        <div className="bg-white rounded-[32px] shadow-xl border border-gray-100 p-5 flex items-center justify-between">
+          <ChevronDown className="w-5 h-5 text-gray-400" />
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-gray-900">تبديل الحساب النشط</span>
+            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
+              <UserCircle2 className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Administration & Identity Group */}
+        <SettingsGroup title="الإدارة والهوية" icon={ShieldCheck}>
+          <SettingsItem 
+            icon={Building2} 
+            title="معلومات المكتب" 
+            subtitle="تعديل بيانات السجل والهوية"
+            color="bg-emerald-50"
+            iconColor="text-emerald-600"
+          />
+          <SettingsItem 
+            icon={User} 
+            title="الملف الشخصي للمكتب" 
+            subtitle="تعديل بيانات المكتب والاتصال"
+            color="bg-blue-50"
+            iconColor="text-blue-600"
+          />
+          {!isChangingPassword ? (
+            <SettingsItem 
+              icon={ShieldCheck} 
+              title="تغيير كلمة المرور" 
+              subtitle="تأمين حسابك بكلمة مرور جديدة"
+              color="bg-purple-50"
+              iconColor="text-purple-600"
+              onClick={() => setIsChangingPassword(true)}
+            />
+          ) : (
+            <div className="p-6 space-y-4 bg-gray-50/50">
+              <input 
+                type="password" 
+                placeholder="كلمة المرور القديمة" 
+                className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 bg-white text-right"
+                value={oldPassword}
+                onChange={e => setOldPassword(e.target.value)}
+              />
+              <input 
+                type="password" 
+                placeholder="كلمة المرور الجديدة" 
+                className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 bg-white text-right"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+              />
+              <input 
+                type="password" 
+                placeholder="تأكيد كلمة المرور الجديدة" 
+                className="w-full p-4 border-2 border-gray-100 rounded-2xl outline-none focus:border-blue-500 bg-white text-right"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+              />
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={handleChangePassword}
+                  disabled={isLoading}
+                  className="flex-[2] bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50"
+                >
+                  {isLoading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                </button>
+                <button 
+                  onClick={() => setIsChangingPassword(false)}
+                  className="flex-1 bg-white border border-gray-200 text-gray-500 py-4 rounded-2xl font-bold"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          )}
+        </SettingsGroup>
+
+        {/* Data Group */}
+        <SettingsGroup title="البيانات" icon={CreditCard}>
+          <SettingsItem 
+            icon={Trash2} 
+            title="مسح كافة البيانات المحلية" 
+            subtitle="حذف جميع بيانات Isar والملفات المؤقتة"
+            color="bg-red-50"
+            iconColor="text-red-500"
+            onClick={() => showToast('سيتم مسح البيانات المحلية قريباً', 'info')}
+          />
+        </SettingsGroup>
+
+        {/* Support & Contact Group */}
+        <SettingsGroup title="الدعم والتواصل" icon={HelpCircle}>
+          <SettingsItem 
+            icon={Lightbulb} 
+            title="اقتراح ميزة" 
+            subtitle="شاركنا أفكارك لتطوير التطبيق"
+            color="bg-amber-50"
+            iconColor="text-amber-500"
+          />
+          <SettingsItem 
+            icon={Bug} 
+            title="الإبلاغ عن مشكلة" 
+            subtitle="أخبرنا إذا واجهت أي خطأ تقني"
+            color="bg-rose-50"
+            iconColor="text-rose-500"
+          />
+        </SettingsGroup>
+
+        {/* Social Media Group */}
+        <SettingsGroup title="تابعنا على وسائل التواصل" icon={Share2}>
+          <SettingsItem 
+            icon={Facebook} 
+            title="فيسبوك" 
+            subtitle="تابع آخر الأخبار على صفحتنا"
+            color="bg-blue-50"
+            iconColor="text-blue-600"
+            onClick={() => window.open('https://facebook.com', '_blank')}
+          />
+          <SettingsItem 
+            icon={MessageCircle} 
+            title="واتساب" 
+            subtitle="تواصل معنا مباشرة عبر واتساب"
+            color="bg-green-50"
+            iconColor="text-green-600"
+            onClick={() => window.open('https://wa.me', '_blank')}
+          />
+          <SettingsItem 
+            icon={Send} 
+            title="تليجرام" 
+            subtitle="انضم لقناتنا على تليجرام"
+            color="bg-sky-50"
+            iconColor="text-sky-600"
+            onClick={() => window.open('https://t.me', '_blank')}
+          />
+          <SettingsItem 
+            icon={Youtube} 
+            title="يوتيوب" 
+            subtitle="شاهد شروحات التطبيق"
+            color="bg-red-50"
+            iconColor="text-red-600"
+            onClick={() => window.open('https://youtube.com', '_blank')}
+          />
+          <SettingsItem 
+            icon={Instagram} 
+            title="انستجرام" 
+            subtitle="تابعنا على انستجرام"
+            color="bg-pink-50"
+            iconColor="text-pink-600"
+            onClick={() => window.open('https://instagram.com', '_blank')}
+          />
+          <SettingsItem 
+            icon={Music2} 
+            title="تيك توك" 
+            subtitle="تابعنا على تيك توك"
+            color="bg-gray-100"
+            iconColor="text-gray-900"
+            onClick={() => window.open('https://tiktok.com', '_blank')}
+          />
+        </SettingsGroup>
+
+        {/* About App Group */}
+        <SettingsGroup title="عن التطبيق" icon={Info}>
+          <div className="p-6 text-center space-y-2">
+            <p className="text-gray-900 font-bold">منصة نقابة المحامين بالفيوم الذكية</p>
+            <p className="text-gray-400 text-xs leading-relaxed px-4">
+              هذا التطبيق مخصص للسادة المحامين بمحافظة الفيوم لتسهيل إدارة أعمالهم ومواكبة التحول الرقمي في منظومة القضاء المصري.
+            </p>
+            <div className="pt-4 flex flex-col items-center">
+              <p className="text-[10px] text-gray-300">الإصدار 1.0.0</p>
+              <p className="text-[10px] text-gray-300">آخر تحديث: {BUILD_DATE}</p>
+            </div>
+          </div>
+        </SettingsGroup>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-4 pt-4">
+          <button 
+            onClick={onLogout}
+            className="flex items-center justify-center gap-2 bg-red-600 text-white py-4 rounded-[24px] font-bold shadow-lg shadow-red-900/20 hover:bg-red-700 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            تسجيل الخروج
+          </button>
+          <button 
+            onClick={() => showToast('سيتم حذف الحساب قريباً', 'info')}
+            className="flex items-center justify-center gap-2 bg-white border-2 border-red-100 text-red-500 py-4 rounded-[24px] font-bold hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+            حذف الحساب نهائياً
+          </button>
+        </div>
       </div>
     </div>
   );
