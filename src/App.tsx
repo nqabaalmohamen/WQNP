@@ -2538,6 +2538,25 @@ const FinanceScreen = ({ onBack, data, updateData }: any) => {
   );
 };
 
+const PlaceholderScreen = ({ title, onBack }: { title: string, onBack: () => void }) => (
+  <div className="min-h-screen bg-gray-50 flex flex-col">
+    <Header title={title} onBack={onBack} />
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+      <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center">
+        <Info className="w-10 h-10 text-blue-600" />
+      </div>
+      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+      <p className="text-gray-500 text-sm">هذه الصفحة قيد التطوير حالياً لتطابق تطبيق "دعم المحامي" بالكامل. سيتم تفعيلها في التحديث القادم.</p>
+      <button 
+        onClick={onBack}
+        className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg"
+      >
+        العودة للخلف
+      </button>
+    </div>
+  </div>
+);
+
 const BailiffsScreen = ({ onBack }: { onBack: () => void }) => {
   const [procedures, setProcedures] = useState([
     { id: '1', title: 'إعلان صحيفة دعوى', status: 'تم التسليم', date: '2026-03-05' },
@@ -4027,6 +4046,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             subtitle="تعديل بيانات السجل والهوية"
             color="bg-emerald-50"
             iconColor="text-emerald-600"
+            onClick={() => navigate('/office-info')}
           />
           <SettingsItem 
             icon={User} 
@@ -4034,6 +4054,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             subtitle="تعديل بيانات المكتب والاتصال"
             color="bg-blue-50"
             iconColor="text-blue-600"
+            onClick={() => navigate('/office-profile')}
           />
           {!isChangingPassword ? (
             <SettingsItem 
@@ -4106,6 +4127,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             subtitle="شاركنا أفكارك لتطوير التطبيق"
             color="bg-amber-50"
             iconColor="text-amber-500"
+            onClick={() => navigate('/suggest-feature')}
           />
           <SettingsItem 
             icon={Bug} 
@@ -4113,6 +4135,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             subtitle="أخبرنا إذا واجهت أي خطأ تقني"
             color="bg-rose-50"
             iconColor="text-rose-500"
+            onClick={() => navigate('/report-issue')}
           />
         </SettingsGroup>
 
@@ -4536,6 +4559,14 @@ export default function App() {
               <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/" />} />
               <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/" />} />
               <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/" />} />
+              <Route path="/agenda" element={isLoggedIn ? <AgendaScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} tasks={data?.tasks || []} /> : <Navigate to="/" />} />
+              <Route path="/bailiffs" element={isLoggedIn ? <BailiffsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              
+              {/* Profile Sub-routes */}
+              <Route path="/office-info" element={isLoggedIn ? <PlaceholderScreen title="معلومات المكتب" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/office-profile" element={isLoggedIn ? <PlaceholderScreen title="الملف الشخصي للمكتب" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/suggest-feature" element={isLoggedIn ? <PlaceholderScreen title="اقتراح ميزة" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/report-issue" element={isLoggedIn ? <PlaceholderScreen title="الإبلاغ عن مشكلة" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               
               <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={user ? (data?.users?.find((u:any)=>u?.phone===user?.phone)?.notifications || []) : []} reminders={data?.reminders || []} onDelete={async (id) => {
                 if (!user) return;
