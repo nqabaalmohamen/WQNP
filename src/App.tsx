@@ -133,82 +133,22 @@ const useOnlineStatus = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const checkRealStatus = async () => {
-      if (!navigator.onLine) {
-        handleOffline();
-        return;
-      }
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        // التحقق من الوصول الفعلي للسيرفر السحابي لضمان القدرة على المزامنة
-        await fetch('https://ayxmuvfbhleijlynsdbv.supabase.co/rest/v1/', { 
-          method: 'HEAD', 
-          mode: 'no-cors',
-          signal: controller.signal 
-        });
-        clearTimeout(timeoutId);
-        setIsOnline(true);
-      } catch (e) {
-        handleOffline();
-      }
+    const handleStatusChange = () => {
+      setIsOnline(navigator.onLine);
     };
 
-    const handleOffline = () => {
-      setIsOnline(false);
-      // لا نقوم بمسح البيانات أو إعادة التحميل القسري لضمان استمرارية عمل المحامي
-      console.warn("تم فقد الاتصال بالإنترنت. النظام يعمل الآن في وضع عدم الاتصال.");
-    };
-
-    window.addEventListener('online', checkRealStatus);
-    window.addEventListener('offline', handleOffline);
-
-    // فحص دوري كل 5 ثوانٍ لضمان استمرارية الاتصال
-    const interval = setInterval(checkRealStatus, 5000);
+    window.addEventListener('online', handleStatusChange);
+    window.addEventListener('offline', handleStatusChange);
 
     return () => {
-      window.removeEventListener('online', checkRealStatus);
-      window.removeEventListener('offline', handleOffline);
-      clearInterval(interval);
+      window.removeEventListener('online', handleStatusChange);
+      window.removeEventListener('offline', handleStatusChange);
     };
   }, []);
 
   return isOnline;
 };
 
-const OfflineOverlay = () => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    className="fixed inset-0 z-[2000] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
-  >
-    <div className="w-32 h-32 bg-red-600/20 rounded-full flex items-center justify-center mb-10 shadow-2xl shadow-red-600/10 border border-red-500/30">
-      <XCircle className="w-16 h-16 text-red-500 animate-pulse" />
-    </div>
-    <h1 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight">نظام المزامنة: غير متصل</h1>
-    <p className="text-slate-400 max-w-2xl leading-relaxed mb-10 text-xl md:text-2xl">
-      عذراً، تم <span className="text-red-500 font-bold">حظر الوصول للنظام</span> مؤقتاً لعدم وجود اتصال بالإنترنت.
-      <br />
-      يجب أن تكون متصلاً لضمان حفظ بياناتك ومزامنتها مع السحابة بشكل آمن.
-    </p>
-    <div className="flex flex-col gap-5 w-full max-w-sm">
-      <button 
-        onClick={() => window.location.reload()}
-        className="w-full py-6 bg-red-600 text-white rounded-3xl font-black text-2xl shadow-2xl shadow-red-900/40 hover:bg-red-700 transition-all cursor-pointer transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
-      >
-        <Globe className="w-6 h-6" />
-        إعادة محاولة الاتصال
-      </button>
-      <div className="flex items-center justify-center gap-3 text-slate-500 font-bold bg-slate-900/50 py-3 rounded-2xl border border-slate-800">
-        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-        جاري مراقبة استقرار الشبكة...
-      </div>
-    </div>
-    <p className="mt-12 text-slate-600 text-sm font-medium">نقابة المحامين بالفيوم - نظام الحماية السحابي المشدد</p>
-  </motion.div>
-);
-
-// --- Mock API for Static Hosting (GitHub Pages) ---
 const isStaticHost = true; // يتم تحويله لموقع ثابت (Static Mode) بالكامل بناءً على طلب المستخدم
 
 const getLocalDB = () => {
@@ -737,7 +677,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const BUILD_DATE = "2026-03-28 14:40";
+const BUILD_DATE = "2026-03-28 14:55";
 
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
@@ -4200,6 +4140,58 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
   );
 };
 
+const SettingsItem = ({ icon: Icon, title, subtitle, onClick, color = "bg-blue-50", iconColor = "text-blue-600", showArrow = true }: any) => (
+  <button 
+    onClick={onClick}
+    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group cursor-pointer"
+  >
+    <div className="flex items-center gap-4">
+      <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110`}>
+        <Icon className={`w-6 h-6 ${iconColor}`} />
+      </div>
+      <div className="text-right">
+        <h4 className="font-bold text-gray-900 text-sm">{title}</h4>
+        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+    {showArrow && <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />}
+  </button>
+);
+
+const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = true }: any) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden mb-4">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-5 flex items-center justify-between bg-white border-b border-gray-50 cursor-pointer"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+            <Icon className="w-5 h-5 text-blue-600" />
+          </div>
+          <span className="font-bold text-gray-900">{title}</span>
+        </div>
+        <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="divide-y divide-gray-50">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const ProfileScreen = ({ user, onLogout, onBack, showToast, requestConfirm }: { user: any, onLogout: () => void, onBack: () => void, showToast: (m: string, t: any) => void, requestConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
@@ -4270,58 +4262,6 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast, requestConfirm }: { 
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const SettingsItem = ({ icon: Icon, title, subtitle, onClick, color = "bg-blue-50", iconColor = "text-blue-600", showArrow = true }: any) => (
-    <button 
-      onClick={onClick}
-      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group"
-    >
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 ${color} rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110`}>
-          <Icon className={`w-6 h-6 ${iconColor}`} />
-        </div>
-        <div className="text-right">
-          <h4 className="font-bold text-gray-900 text-sm">{title}</h4>
-          {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
-        </div>
-      </div>
-      {showArrow && <ChevronLeft className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />}
-    </button>
-  );
-
-  const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = true }: any) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
-    return (
-      <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden mb-4">
-        <button 
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full p-5 flex items-center justify-between bg-white border-b border-gray-50"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-              <Icon className="w-5 h-5 text-blue-600" />
-            </div>
-            <span className="font-bold text-gray-900">{title}</span>
-          </div>
-          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        </button>
-        <AnimatePresence>
-          {isOpen && (
-            <motion.div 
-              initial={{ height: 0 }}
-              animate={{ height: 'auto' }}
-              exit={{ height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="divide-y divide-gray-50">
-                {children}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
   };
 
   return (
