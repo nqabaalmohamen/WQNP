@@ -123,8 +123,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-const BUILD_DATE = "2026-03-25 02:30 PM"; // تحديث شامل لحل مشكلة الشاشة البيضاء
-
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -233,7 +231,7 @@ const getLocalDB = () => {
 
 const initializeDB = () => {
   const initialDB = { 
-    version: 5,
+    version: 6,
     users: [
       { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin", notifications: [] }
     ], 
@@ -288,6 +286,20 @@ const initializeDB = () => {
     resetRequests: [],
     systemEvents: [], 
     activeSessions: [],
+    officeData: {
+      name: "مكتب الأستاذ / محمد جمال",
+      regNo: "123456",
+      address: "الفيوم - شارع المحافظة",
+      phone: "0123456789",
+      specialty: "قضايا الجنايات والمدني",
+      workingHours: "يومياً من 5 م إلى 10 م (عدا الجمعة)",
+      bio: "مكتب متخصص في كافة أعمال المحاماة والاستشارات القانونية، خبرة أكثر من 15 عاماً في المحاكم المصرية."
+    },
+    bailiffs: [
+      { id: '1', title: 'إعلان صحيفة دعوى', status: 'تم التسليم', date: '2026-03-05' },
+      { id: '2', title: 'إعلان حكم تمهيدي', status: 'قيد التنفيذ', date: '2026-03-08' },
+      { id: '3', title: 'إعلان استئناف', status: 'بانتظار الرد', date: '2026-03-09' },
+    ],
     geminiApiKey: "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q",
     openRouterApiKey: "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",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
@@ -725,6 +737,8 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
+const BUILD_DATE = "2026-03-28 14:40";
+
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -870,9 +884,20 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) 
               ))}
             </div>
             
-            <div className="p-6 border-t border-gray-100">
-              <p className="text-[10px] text-gray-400 text-center mb-1">آخر تحديث: {BUILD_DATE}</p>
-              <p className="text-xs text-gray-400 text-center">الإصدار 1.0.0</p>
+            <div className="p-6 border-t border-gray-100 space-y-4">
+              <p className="text-[10px] text-gray-400 text-center font-bold uppercase tracking-widest">
+                آخر تحديث: {BUILD_DATE}
+              </p>
+              <button 
+                onClick={() => {
+                  logout();
+                  onClose();
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 py-4 rounded-2xl font-black hover:bg-red-100 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-5 h-5" />
+                تسجيل الخروج
+              </button>
             </div>
           </motion.div>
         </>
@@ -2538,43 +2563,329 @@ const FinanceScreen = ({ onBack, data, updateData }: any) => {
   );
 };
 
-const PlaceholderScreen = ({ title, onBack }: { title: string, onBack: () => void }) => (
-  <div className="min-h-screen bg-gray-50 flex flex-col" dir="rtl">
-    <Header title={title} onBack={onBack} />
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-      <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center">
-        <Info className="w-10 h-10 text-blue-600" />
-      </div>
-      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-      <p className="text-gray-500 text-sm">هذه الصفحة قيد التطوير حالياً لتطابق تطبيق "دعم المحامي" بالكامل. سيتم تفعيلها في التحديث القادم.</p>
-      <button 
-        onClick={onBack}
-        className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg"
-      >
-        العودة للخلف
-      </button>
-    </div>
-  </div>
-);
+const OfficeInfoScreen = ({ onBack, data }: { onBack: () => void, data: any }) => {
+  useEffect(() => {
+    console.log("OfficeInfoScreen mounted with data:", data?.officeData);
+  }, [data]);
 
-const BailiffsScreen = ({ onBack }: { onBack: () => void }) => {
-  const [procedures, setProcedures] = useState([
-    { id: '1', title: 'إعلان صحيفة دعوى', status: 'تم التسليم', date: '2026-03-05' },
-    { id: '2', title: 'إعلان حكم تمهيدي', status: 'قيد التنفيذ', date: '2026-03-08' },
-    { id: '3', title: 'إعلان استئناف', status: 'بانتظار الرد', date: '2026-03-09' },
-  ]);
+  const office = data?.officeData || {
+    name: "مكتب الأستاذ / محمد جمال",
+    regNo: "123456",
+    address: "الفيوم - شارع المحافظة",
+    phone: "0123456789"
+  };
+
+  return (
+    <div className="pb-24 min-h-screen bg-gray-50">
+      <Header title="معلومات المكتب" onBack={onBack} />
+      <div className="p-4 space-y-6 max-w-2xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-[32px] p-8 shadow-xl border border-gray-100 space-y-6"
+        >
+          <div className="flex items-center gap-5 border-b border-gray-50 pb-6">
+            <div className="w-20 h-20 bg-blue-50 rounded-[24px] flex items-center justify-center shadow-inner">
+              <Building2 className="w-10 h-10 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900">سجل بيانات المكتب</h3>
+              <p className="text-sm text-gray-500 font-medium">البيانات الرسمية المعتمدة في النظام</p>
+            </div>
+          </div>
+          
+          <div className="grid gap-4">
+            {[
+              { label: "اسم المكتب", value: office.name, icon: User },
+              { label: "رقم القيد", value: office.regNo, icon: ShieldCheck },
+              { label: "العنوان", value: office.address, icon: Globe },
+              { label: "رقم الهاتف", value: office.phone, icon: MessageCircle }
+            ].map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100/50 group hover:bg-white hover:shadow-md transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-100">
+                    <item.icon className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <span className="text-gray-500 text-sm font-bold">{item.label}</span>
+                </div>
+                <span className="font-black text-gray-900 text-lg">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <div className="bg-blue-600 rounded-[32px] p-8 text-white space-y-4 shadow-xl shadow-blue-900/20 relative overflow-hidden">
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+          <h4 className="font-black text-xl flex items-center gap-3">
+            <ShieldCheck className="w-6 h-6" />
+            بيانات التوثيق
+          </h4>
+          <p className="text-sm text-blue-50 leading-relaxed font-medium">
+            هذه البيانات تظهر تلقائياً في جميع المذكرات والعرائض القانونية التي يتم إنشاؤها عبر الذكاء الاصطناعي لضمان رسمية المستندات.
+          </p>
+          <p className="text-xs text-blue-200 italic border-t border-white/10 pt-4">
+            * لتعديل هذه البيانات، يرجى الانتقال إلى "ملف المكتب" من إعدادات الحساب.
+          </p>
+        </div>
+        
+        <button 
+          onClick={() => window.print()}
+          className="w-full bg-slate-900 text-white p-5 rounded-[24px] font-black shadow-2xl flex items-center justify-center gap-3 hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+        >
+          <Download className="w-6 h-6" />
+          تحميل بطاقة الهوية الرقمية للمكتب
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const OfficeProfileScreen = ({ onBack, data, updateData, showToast }: { onBack: () => void, data: any, updateData: (u: any) => void, showToast: (m: string, t: any) => void }) => {
+  const [office, setOffice] = useState(data?.officeData || {
+    name: "مكتب الأستاذ / محمد جمال",
+    regNo: "123456",
+    address: "الفيوم - شارع المحافظة",
+    phone: "0123456789",
+    specialty: "قضايا الجنايات والمدني",
+    workingHours: "يومياً من 5 م إلى 10 م (عدا الجمعة)",
+    bio: "مكتب متخصص في كافة أعمال المحاماة والاستشارات القانونية، خبرة أكثر من 15 عاماً في المحاكم المصرية."
+  });
+
+  useEffect(() => {
+    if (data?.officeData) {
+      setOffice(data.officeData);
+    }
+  }, [data?.officeData]);
+
+  const handleSave = async () => {
+    try {
+      console.log("Saving office data:", office);
+      await updateData({ officeData: office });
+      showToast('✅ تم حفظ بيانات المكتب بنجاح', 'success');
+      onBack();
+    } catch (e) {
+      console.error("Failed to save office data:", e);
+      showToast('❌ فشل حفظ البيانات، يرجى المحاولة مرة أخرى', 'error');
+    }
+  };
+
+  return (
+    <div className="pb-24 min-h-screen bg-gray-50">
+      <Header title="الملف الشخصي للمكتب" onBack={onBack} />
+      <div className="p-4 space-y-6 max-w-2xl mx-auto">
+        <div className="flex flex-col items-center gap-6 py-8">
+          <div className="relative group">
+            <div className="w-40 h-40 bg-blue-100 rounded-full flex items-center justify-center border-8 border-white shadow-2xl overflow-hidden transition-transform group-hover:scale-105">
+              <Scale className="w-20 h-20 text-blue-600" />
+            </div>
+            <button className="absolute bottom-2 right-2 bg-blue-600 text-white p-3 rounded-full border-4 border-white shadow-xl hover:bg-blue-700 transition-colors active:scale-90">
+              <Camera className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="text-center space-y-1">
+            <h3 className="text-2xl font-black text-gray-900">{office.name}</h3>
+            <p className="text-sm text-gray-500 font-bold">{office.specialty}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[32px] p-8 shadow-xl border border-gray-100 space-y-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                <User className="w-4 h-4" /> اسم المكتب
+              </label>
+              <input 
+                type="text" 
+                value={office.name} 
+                onChange={e => setOffice({...office, name: e.target.value})}
+                placeholder="أدخل اسم المكتب الرسمي"
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> رقم القيد
+                </label>
+                <input 
+                  type="text" 
+                  value={office.regNo} 
+                  onChange={e => setOffice({...office, regNo: e.target.value})}
+                  className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4" /> رقم الهاتف
+                </label>
+                <input 
+                  type="text" 
+                  value={office.phone} 
+                  onChange={e => setOffice({...office, phone: e.target.value})}
+                  className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                <Globe className="w-4 h-4" /> العنوان الكامل
+              </label>
+              <input 
+                type="text" 
+                value={office.address} 
+                onChange={e => setOffice({...office, address: e.target.value})}
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                <Sparkles className="w-4 h-4" /> التخصص الرئيسي
+              </label>
+              <input 
+                type="text" 
+                value={office.specialty} 
+                onChange={e => setOffice({...office, specialty: e.target.value})}
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                <Clock className="w-4 h-4" /> مواعيد العمل
+              </label>
+              <input 
+                type="text" 
+                value={office.workingHours} 
+                onChange={e => setOffice({...office, workingHours: e.target.value})}
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-500 mr-2 flex items-center gap-2">
+                <FileText className="w-4 h-4" /> نبذة تعريفية للمكتب
+              </label>
+              <textarea 
+                rows={5} 
+                value={office.bio} 
+                onChange={e => setOffice({...office, bio: e.target.value})}
+                className="w-full bg-gray-50 border-2 border-transparent p-5 rounded-2xl font-bold text-gray-900 outline-none focus:border-blue-500 focus:bg-white transition-all shadow-inner resize-none" 
+              />
+            </div>
+          </div>
+
+          <button 
+            onClick={handleSave}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-[24px] font-black shadow-xl shadow-blue-900/20 hover:shadow-blue-900/40 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-3 mt-4"
+          >
+            <CheckCircle2 className="w-7 h-7" />
+            حفظ كافة التغييرات
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SuggestFeatureScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (m: string, t: any) => void }) => {
+  const [suggestion, setSuggestion] = useState('');
+  const handleSubmit = () => {
+    if (!suggestion.trim()) return;
+    showToast('شكراً لاقتراحك! سيتم مراجعته من قبل فريق التطوير', 'success');
+    onBack();
+  };
+  return (
+    <div className="pb-24">
+      <Header title="اقتراح ميزة جديدة" onBack={onBack} />
+      <div className="p-6 space-y-6">
+        <div className="bg-amber-50 border border-amber-100 p-6 rounded-3xl space-y-2">
+          <h4 className="font-bold text-amber-900 flex items-center gap-2">
+            <Lightbulb className="w-5 h-5" />
+            ساعدنا في تطوير تطبيقك
+          </h4>
+          <p className="text-xs text-amber-700 leading-relaxed">
+            نحن نسعى دائماً لتطوير المنصة لتناسب احتياجات السادة المحامين بالفيوم. أي ميزة تقترحها قد تصبح واقعاً في التحديث القادم.
+          </p>
+        </div>
+        
+        <textarea 
+          rows={6} 
+          placeholder="اكتب وصف الميزة التي تود إضافتها في النظام..." 
+          className="w-full bg-white border border-gray-100 p-4 rounded-2xl shadow-sm outline-none focus:ring-2 focus:ring-amber-500"
+          value={suggestion}
+          onChange={(e) => setSuggestion(e.target.value)}
+        />
+
+        <button 
+          onClick={handleSubmit}
+          className="w-full bg-amber-500 text-white p-4 rounded-2xl font-bold shadow-lg shadow-amber-900/20 cursor-pointer"
+        >
+          إرسال الاقتراح
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ReportIssueScreen = ({ onBack, showToast }: { onBack: () => void, showToast: (m: string, t: any) => void }) => {
+  const [issue, setIssue] = useState('');
+  const handleSubmit = () => {
+    if (!issue.trim()) return;
+    showToast('تم إرسال التقرير. فريق الدعم سيعمل على حل المشكلة فوراً', 'success');
+    onBack();
+  };
+  return (
+    <div className="pb-24">
+      <Header title="الإبلاغ عن مشكلة" onBack={onBack} />
+      <div className="p-6 space-y-6">
+        <div className="bg-red-50 border border-red-100 p-6 rounded-3xl space-y-2">
+          <h4 className="font-bold text-red-900 flex items-center gap-2">
+            <Bug className="w-5 h-5" />
+            الإبلاغ عن عطل فني
+          </h4>
+          <p className="text-xs text-red-700 leading-relaxed">
+            إذا واجهت أي مشكلة في النظام أو ظهور شاشة بيضاء أو عدم عمل أي زر، يرجى إخبارنا بالتفاصيل.
+          </p>
+        </div>
+        
+        <textarea 
+          rows={6} 
+          placeholder="اشرح المشكلة التي واجهتها بالتفصيل..." 
+          className="w-full bg-white border border-gray-100 p-4 rounded-2xl shadow-sm outline-none focus:ring-2 focus:ring-red-500"
+          value={issue}
+          onChange={(e) => setIssue(e.target.value)}
+        />
+
+        <button 
+          onClick={handleSubmit}
+          className="w-full bg-red-600 text-white p-4 rounded-2xl font-bold shadow-lg shadow-red-900/20 cursor-pointer"
+        >
+          إرسال التقرير
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const BailiffsScreen = ({ onBack, data, updateData }: { onBack: () => void, data: any, updateData: (u: any) => void }) => {
+  const procedures = data?.bailiffs || [];
   const [showAdd, setShowAdd] = useState(false);
   const [newProc, setNewProc] = useState({ title: '', date: format(new Date(), 'yyyy-MM-dd') });
 
-  const addProc = () => {
+  const addProc = async () => {
     if (!newProc.title) return;
-    setProcedures([{ id: Date.now().toString(), ...newProc, status: 'قيد التنفيذ' }, ...procedures]);
+    const updated = [{ id: Date.now().toString(), ...newProc, status: 'قيد التنفيذ' }, ...procedures];
+    await updateData({ bailiffs: updated });
     setShowAdd(false);
     setNewProc({ title: '', date: format(new Date(), 'yyyy-MM-dd') });
   };
 
-  const deleteProc = (id: string) => {
-    setProcedures(procedures.filter(p => p.id !== id));
+  const deleteProc = async (id: string) => {
+    const updated = procedures.filter((p: any) => p.id !== id);
+    await updateData({ bailiffs: updated });
   };
 
   return (
@@ -3889,12 +4200,48 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
   );
 };
 
-const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLogout: () => void, onBack: () => void, showToast: (m: string, t: any) => void }) => {
+const ProfileScreen = ({ user, onLogout, onBack, showToast, requestConfirm }: { user: any, onLogout: () => void, onBack: () => void, showToast: (m: string, t: any) => void, requestConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleClearData = () => {
+    requestConfirm(
+      'مسح البيانات المحلية',
+      'هل أنت متأكد من مسح كافة البيانات المخزنة محلياً؟ سيتم إعادة تحميل التطبيق ومزامنة البيانات من السحابة مرة أخرى.',
+      () => {
+        localStorage.removeItem('lawyer_app_db');
+        window.location.reload();
+      }
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    requestConfirm(
+      'حذف الحساب نهائياً',
+      'هل أنت متأكد من حذف حسابك نهائياً؟ لا يمكن التراجع عن هذا الإجراء وسيتم مسح كافة بياناتك من النظام.',
+      async () => {
+        try {
+          const response = await apiFetch('/api/admin/delete-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: user.phone })
+          });
+          if (response.ok) {
+            showToast('تم حذف الحساب بنجاح', 'success');
+            onLogout();
+          } else {
+            showToast('فشل حذف الحساب', 'error');
+          }
+        } catch (error) {
+          showToast('خطأ في الاتصال', 'error');
+        }
+      }
+    );
+  };
 
   const handleChangePassword = async () => {
     if (!oldPassword) return showToast('يرجى إدخال كلمة المرور القديمة', 'error');
@@ -4115,7 +4462,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             subtitle="حذف جميع بيانات Isar والملفات المؤقتة"
             color="bg-red-50"
             iconColor="text-red-500"
-            onClick={() => showToast('سيتم مسح البيانات المحلية قريباً', 'info')}
+            onClick={handleClearData}
           />
         </SettingsGroup>
 
@@ -4215,7 +4562,7 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast }: { user: any, onLog
             تسجيل الخروج
           </button>
           <button 
-            onClick={() => showToast('سيتم حذف الحساب قريباً', 'info')}
+            onClick={handleDeleteAccount}
             className="flex items-center justify-center gap-2 bg-white border-2 border-red-100 text-red-500 py-4 rounded-[24px] font-bold hover:bg-red-50 transition-colors"
           >
             <Trash2 className="w-5 h-5" />
@@ -4293,10 +4640,70 @@ export default function App() {
     const initApp = async () => {
       try {
         if (!navigator.onLine) {
+          // التحقق من وجود بيانات المكتب حتى في وضع عدم الاتصال
+          const localDb = getLocalDB();
+          let needsUpdate = false;
+          const updates: any = {};
+
+          if (localDb && !localDb.officeData) {
+            updates.officeData = {
+              name: "مكتب الأستاذ / محمد جمال",
+              regNo: "123456",
+              address: "الفيوم - شارع المحافظة",
+              phone: "0123456789",
+              specialty: "قضايا الجنايات والمدني",
+              workingHours: "يومياً من 5 م إلى 10 م (عدا الجمعة)",
+              bio: "مكتب متخصص في كافة أعمال المحاماة والاستشارات القانونية، خبرة أكثر من 15 عاماً في المحاكم المصرية."
+            };
+            needsUpdate = true;
+          }
+
+          if (localDb && !localDb.bailiffs) {
+            updates.bailiffs = [
+              { id: '1', title: 'إعلان صحيفة دعوى', status: 'تم التسليم', date: '2026-03-05' },
+              { id: '2', title: 'إعلان حكم تمهيدي', status: 'قيد التنفيذ', date: '2026-03-08' },
+              { id: '3', title: 'إعلان استئناف', status: 'بانتظار الرد', date: '2026-03-09' },
+            ];
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            const patchedDb = { ...localDb, ...updates };
+            setData(patchedDb);
+            saveLocalDB(patchedDb);
+          }
           return;
         }
         const cloudData = await loadFromSupabase();
-        if (cloudData) setData(cloudData);
+        if (cloudData) {
+          // ضمان وجود بيانات المكتب عند التحميل من السحابة
+          let needsSync = false;
+          if (!cloudData.officeData) {
+            cloudData.officeData = {
+              name: "مكتب الأستاذ / محمد جمال",
+              regNo: "123456",
+              address: "الفيوم - شارع المحافظة",
+              phone: "0123456789",
+              specialty: "قضايا الجنايات والمدني",
+              workingHours: "يومياً من 5 م إلى 10 م (عدا الجمعة)",
+              bio: "مكتب متخصص في كافة أعمال المحاماة والاستشارات القانونية، خبرة أكثر من 15 عاماً في المحاكم المصرية."
+            };
+            needsSync = true;
+          }
+          if (!cloudData.bailiffs) {
+            cloudData.bailiffs = [
+              { id: '1', title: 'إعلان صحيفة دعوى', status: 'تم التسليم', date: '2026-03-05' },
+              { id: '2', title: 'إعلان حكم تمهيدي', status: 'قيد التنفيذ', date: '2026-03-08' },
+              { id: '3', title: 'إعلان استئناف', status: 'بانتظار الرد', date: '2026-03-09' },
+            ];
+            needsSync = true;
+          }
+          if (needsSync) {
+            saveLocalDB(cloudData);
+            await syncToSupabase(cloudData);
+          }
+          setData(cloudData);
+        }
       } catch (e) {
         console.error("Initialization sync failed, using local data:", e);
       }
@@ -4560,13 +4967,13 @@ export default function App() {
               <Route path="/tasks" element={isLoggedIn ? <TasksScreen onBack={() => navigate(-1)} tasks={data?.tasks || []} onToggle={toggleTask} onDelete={deleteTask} /> : <Navigate to="/" />} />
               <Route path="/reminders" element={isLoggedIn ? <RemindersScreen onBack={() => navigate(-1)} reminders={data?.reminders || []} onAdd={addReminder} onDelete={deleteReminder} /> : <Navigate to="/" />} />
               <Route path="/agenda" element={isLoggedIn ? <AgendaScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} tasks={data?.tasks || []} /> : <Navigate to="/" />} />
-              <Route path="/bailiffs" element={isLoggedIn ? <BailiffsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/bailiffs" element={isLoggedIn ? <BailiffsScreen onBack={() => navigate(-1)} data={data} updateData={updateData} /> : <Navigate to="/" />} />
               
               {/* Profile Sub-routes */}
-              <Route path="/office-info" element={isLoggedIn ? <PlaceholderScreen title="معلومات المكتب" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-              <Route path="/office-profile" element={isLoggedIn ? <PlaceholderScreen title="الملف الشخصي للمكتب" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-              <Route path="/suggest-feature" element={isLoggedIn ? <PlaceholderScreen title="اقتراح ميزة" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
-              <Route path="/report-issue" element={isLoggedIn ? <PlaceholderScreen title="الإبلاغ عن مشكلة" onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
+              <Route path="/office-info" element={isLoggedIn ? <OfficeInfoScreen onBack={() => navigate(-1)} data={data} /> : <Navigate to="/" />} />
+              <Route path="/office-profile" element={isLoggedIn ? <OfficeProfileScreen onBack={() => navigate(-1)} data={data} updateData={updateData} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="/suggest-feature" element={isLoggedIn ? <SuggestFeatureScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="/report-issue" element={isLoggedIn ? <ReportIssueScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
               
               <Route path="/notifications" element={isLoggedIn ? <NotificationsScreen onBack={() => navigate(-1)} notifications={user ? (data?.users?.find((u:any)=>u?.phone===user?.phone)?.notifications || []) : []} reminders={data?.reminders || []} onDelete={async (id) => {
                 if (!user) return;
@@ -4575,7 +4982,7 @@ export default function App() {
                 showToast('تم حذف الإشعار', 'success');
               }} /> : <Navigate to="/" />} />
               
-              <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
               <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
