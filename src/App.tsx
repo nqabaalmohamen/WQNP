@@ -687,7 +687,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const BUILD_DATE = "2026-03-28 15:15";
+const BUILD_DATE = "2026-03-28 15:20";
 
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
@@ -4653,6 +4653,8 @@ export default function App() {
           }
           return;
         }
+        
+        // التحميل من السحابة فوراً عند التشغيل
         const cloudData = await loadFromSupabase();
         if (cloudData) {
           // ضمان وجود بيانات المكتب عند التحميل من السحابة
@@ -4677,14 +4679,29 @@ export default function App() {
             ];
             needsSync = true;
           }
+          
           if (needsSync) {
             saveLocalDB(cloudData);
             await syncToSupabase(cloudData);
           }
+          
+          // تحديث الحالة والذاكرة المحلية
           setData(cloudData);
+          saveLocalDB(cloudData);
+
+          // إذا كان المستخدم مسجلاً دخوله، نحدث بياناته من السحابة أيضاً
+          const savedUser = localStorage.getItem('user');
+          if (savedUser) {
+            const parsedUser = JSON.parse(savedUser);
+            const freshUser = cloudData.users.find((u: any) => u.phone === parsedUser.phone);
+            if (freshUser) {
+              setUser(freshUser);
+              localStorage.setItem('user', JSON.stringify(freshUser));
+            }
+          }
         }
       } catch (e) {
-        console.error("Initialization sync failed, using local data:", e);
+        console.error("Initialization sync failed:", e);
       }
     };
     initApp();
