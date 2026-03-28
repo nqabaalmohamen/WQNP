@@ -267,17 +267,28 @@ const syncToSupabase = async (newDb: any) => {
     console.warn('Cannot sync: No internet connection. Data is saved locally.');
     return;
   }
+  
+  // التأكد من أن البيانات المرسلة هي أحدث كائن
   const supabase = getSupabase(newDb);
   if (!supabase) return;
+  
   try {
+    // محاولة المزامنة مع Supabase
     const { error } = await supabase
       .from('app_data')
-      .upsert({ id: 1, content: newDb });
+      .upsert({ 
+        id: 1, 
+        content: newDb, 
+        updated_at: new Date().toISOString() 
+      }, { onConflict: 'id' });
+      
     if (error) {
-      console.error('Supabase Sync Error:', error);
+      console.error('Supabase Sync Error Details:', error.message, error.details, error.hint);
+    } else {
+      console.log('✅ Cloud Sync Successful');
     }
   } catch (e) {
-    console.error('Supabase Connection Error:', e);
+    console.error('Supabase Connection Exception:', e);
   }
 };
 
@@ -440,9 +451,8 @@ const mockFetch = async (url: string, options: any = {}) => {
         return createResponse(false, 400, { error: "كلمة المرور القديمة غير صحيحة" });
       }
       user.password = body.newPassword;
-      saveLocalDB(currentDb);
-      await syncToSupabase(currentDb);
-      return createResponse(true, 200, { message: "تم تغيير كلمة المرور بنجاح" });
+      // لا نحتاج للمزامنة هنا لأن ProfileScreen سيقوم باستدعاء updateData التي تقوم بالمزامنة
+      return createResponse(true, 200, { message: "تم التحقق وتغيير كلمة المرور بنجاح" });
     }
     return createResponse(false, 404, { error: "المستخدم غير موجود" });
   }
@@ -677,7 +687,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const BUILD_DATE = "2026-03-28 15:05";
+const BUILD_DATE = "2026-03-28 15:15";
 
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
@@ -4249,19 +4259,35 @@ const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, show
       });
       const resData = await response.json();
       if (response.ok) {
-        // تحديث الحالة العالمية لضمان حفظ كلمة المرور في السحابة وفي الحالة الحالية
+        // 1. تحديث قائمة المستخدمين في قاعدة البيانات الشاملة
         const updatedUsers = (data?.users || []).map((u: any) => 
           u.phone === user.phone ? { ...u, password: newPassword } : u
         );
         
-        await updateData({ users: updatedUsers });
+        // 2. تسجيل الحدث للمسؤول
+        const event = {
+          id: Date.now().toString(),
+          type: 'تغيير كلمة مرور',
+          message: `قام المستخدم ${user.name} بتغيير كلمة المرور الخاصة به`,
+          severity: 'warning',
+          timestamp: new Date().toISOString(),
+          userName: user.name,
+          userPhone: user.phone
+        };
+        const currentEvents = Array.isArray(data?.systemEvents) ? data.systemEvents : [];
+
+        // 3. المزامنة الشاملة (محلياً وسحابياً)
+        await updateData({ 
+          users: updatedUsers,
+          systemEvents: [event, ...currentEvents].slice(0, 100)
+        });
         
-        // تحديث كائن المستخدم الحالي
+        // 4. تحديث جلسة المستخدم الحالية
         const updatedUser = { ...user, password: newPassword };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
-        showToast(resData.message, 'success');
+        showToast('تم تغيير كلمة المرور ومزامنتها بنجاح', 'success');
         setIsChangingPassword(false);
         setOldPassword('');
         setNewPassword('');
@@ -4270,8 +4296,8 @@ const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, show
         showToast(resData.error, 'error');
       }
     } catch (error) {
-      console.error("Change Password Error:", error);
-      showToast('خطأ في الاتصال', 'error');
+      console.error("Change Password Sync Error:", error);
+      showToast('خطأ في الاتصال أو المزامنة', 'error');
     } finally {
       setIsLoading(false);
     }
