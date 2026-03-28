@@ -55,10 +55,16 @@ import {
   UserCircle2,
   LogOut,
   Settings,
-  CreditCard
+  CreditCard,
+  TrendingUp,
+  TrendingDown,
+  PieChart,
+  Camera,
+  History,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link, Navigate, useParams } from 'react-router-dom';
 import { 
   format, 
   addMonths, 
@@ -227,13 +233,35 @@ const getLocalDB = () => {
 
 const initializeDB = () => {
   const initialDB = { 
-    version: 4,
+    version: 5,
     users: [
       { phone: "0123456789", password: "123", name: "مدير النظام", regNo: "000", status: "approved", role: "admin", notifications: [] }
     ], 
     cases: [
-      { id: '1', title: 'دعوى صحة توقيع', court: 'محكمة الفيوم الابتدائية', number: '1234/2025', status: 'قيد التداول', date: '2026-04-10' },
-      { id: '2', title: 'استئناف مدني', court: 'محكمة استئناف بني سويف', number: '567/2025', status: 'محجوزة للحكم', date: '2026-03-15' },
+      { 
+        id: '1', 
+        title: 'دعوى صحة توقيع', 
+        court: 'محكمة الفيوم الابتدائية', 
+        number: '1234/2025', 
+        status: 'قيد التداول', 
+        date: '2026-04-10',
+        clientName: 'أحمد محمد علي',
+        fees: { total: 5000, paid: 2000, remaining: 3000 },
+        expenses: { total: 500, items: [{ id: 'e1', amount: 500, reason: 'رسوم قيد', date: '2026-03-01' }] },
+        documents: []
+      },
+      { 
+        id: '2', 
+        title: 'استئناف مدني', 
+        court: 'محكمة استئناف بني سويف', 
+        number: '567/2025', 
+        status: 'محجوزة للحكم', 
+        date: '2026-03-15',
+        clientName: 'شركة النيل للمقاولات',
+        fees: { total: 10000, paid: 5000, remaining: 5000 },
+        expenses: { total: 1200, items: [{ id: 'e2', amount: 1200, reason: 'دمغات ورسوم', date: '2026-03-05' }] },
+        documents: []
+      },
     ],
     clients: [
       { id: '1', name: 'أحمد محمد علي', phone: '01012345678', type: 'client' },
@@ -246,16 +274,20 @@ const initializeDB = () => {
       { id: '3', title: 'مقابلة موكل جديد', completed: false, date: '2026-03-12' },
     ],
     sessions: [
-      { id: '1', caseTitle: 'دعوى صحة توقيع', court: 'مدني الفيوم', date: '2026-03-10', time: '09:00 ص' },
-      { id: '2', caseTitle: 'استئناف مدني', court: 'استئناف عالي', date: '2026-03-15', time: '10:30 ص' },
+      { id: '1', caseId: '1', caseTitle: 'دعوى صحة توقيع', court: 'مدني الفيوم', date: '2026-03-10', time: '09:00 ص', demands: 'تقديم أصل الصحيفة', decision: 'التأجيل للاطلاع' },
+      { id: '2', caseId: '2', caseTitle: 'استئناف مدني', court: 'استئناف عالي', date: '2026-03-15', time: '10:30 ص', demands: 'المرافعة', decision: 'حجز للحكم' },
     ],
     reminders: [
       { id: '1', title: 'مراجعة ملف قضية أحمد محمد', time: '10:00' },
       { id: '2', title: 'سداد اشتراك النقابة', time: '12:00' },
     ],
+    finance: [
+      { id: 'f1', type: 'income', amount: 2000, reason: 'دفعة أتعاب - قضية 1234', date: '2026-03-01' },
+      { id: 'f2', type: 'expense', amount: 500, reason: 'رسوم محكمة - قضية 1234', date: '2026-03-01' },
+    ],
     resetRequests: [],
-    systemEvents: [], // سجل الأحداث المباشر
-    activeSessions: [], // جلسات المستخدمين النشطة
+    systemEvents: [], 
+    activeSessions: [],
     geminiApiKey: "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q",
     openRouterApiKey: "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",
     supabaseUrl: "https://ayxmuvfbhleijlynsdbv.supabase.co",
@@ -499,6 +531,18 @@ interface Case {
   number: string;
   status: string;
   date: string;
+  clientName?: string;
+  opponentName?: string;
+  fees?: {
+    total: number;
+    paid: number;
+    remaining: number;
+  };
+  expenses?: {
+    total: number;
+    items: { id: string, amount: number, reason: string, date: string }[];
+  };
+  documents?: { id: string, name: string, date: string, type: string, url: string }[];
 }
 
 interface Client {
@@ -517,10 +561,13 @@ interface Task {
 
 interface Session {
   id: string;
+  caseId?: string;
   caseTitle: string;
   court: string;
   date: string;
   time: string;
+  decision?: string;
+  demands?: string;
 }
 
 interface Reminder {
@@ -1162,7 +1209,7 @@ const MyOfficeScreen = ({ onBack, cases, clients, tasks, sessions, reminders }: 
       <div className="p-4 space-y-6">
         <div className="grid grid-cols-2 gap-4">
           <ActionCard icon={CalendarIcon} title="الأجندة" subtitle={`${sessions.length} جلسات`} color="bg-blue-600" onClick={() => navigate('/agenda')} />
-          <ActionCard icon={Clock} title="التذكيرات" subtitle={`${reminders.length} تذكير`} color="bg-blue-500" onClick={() => navigate('/reminders')} />
+          <ActionCard icon={CreditCard} title="الحسابات" subtitle="الأتعاب والمصاريف" color="bg-emerald-600" onClick={() => navigate('/finance')} />
         </div>
 
         <div className="pt-4">
@@ -2010,6 +2057,7 @@ const GovPlatformsScreen = ({ onBack }: { onBack: () => void }) => {
 // --- Functional Screens ---
 
 const CasesScreen = ({ onBack, cases, onAdd, onDelete }: { onBack: () => void, cases: Case[], onAdd: (c: Omit<Case, 'id'>) => void, onDelete: (id: string) => void }) => {
+  const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
   const [newCase, setNewCase] = useState({ title: '', court: '', number: '', status: 'قيد التداول', date: format(new Date(), 'yyyy-MM-dd') });
 
@@ -2027,9 +2075,13 @@ const CasesScreen = ({ onBack, cases, onAdd, onDelete }: { onBack: () => void, c
 
         <div className="space-y-3">
           {cases.map(c => (
-            <div key={c.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2 relative group">
+            <div 
+              key={c.id} 
+              onClick={() => navigate(`/cases/${c.id}`)}
+              className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2 relative group cursor-pointer hover:border-blue-200 transition-all"
+            >
               <button 
-                onClick={() => onDelete(c.id)}
+                onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
                 className="absolute left-4 top-4 text-red-400 hover:text-red-600 p-1 transition-colors cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
@@ -2200,6 +2252,291 @@ const TasksScreen = ({ onBack, tasks, onToggle, onDelete }: { onBack: () => void
     </div>
   </div>
 );
+
+const CaseDetailsScreen = ({ onBack, cases, sessions, updateData, showToast }: any) => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const c = cases.find((x: any) => x.id === id);
+  const [activeTab, setActiveTab] = useState('info'); // info, sessions, finance, docs
+
+  if (!c) return <div className="p-8 text-center">القضية غير موجودة</div>;
+
+  const caseSessions = sessions.filter((s: any) => s.caseId === id || s.caseTitle === c.title);
+
+  return (
+    <div className="pb-32 bg-gray-50 min-h-screen">
+      <Header title="تفاصيل القضية" onBack={onBack} />
+      
+      {/* Quick Summary Header */}
+      <div className="bg-white p-6 border-b border-gray-100 shadow-sm">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">{c.title}</h2>
+            <p className="text-sm text-gray-500 flex items-center gap-1">
+              <Scale className="w-4 h-4" /> {c.court}
+            </p>
+          </div>
+          <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold border border-blue-100">
+            {c.status}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-50 p-3 rounded-2xl">
+            <p className="text-[10px] text-gray-400 font-bold mb-1">رقم القضية</p>
+            <p className="text-sm font-bold text-gray-700">{c.number}</p>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-2xl">
+            <p className="text-[10px] text-gray-400 font-bold mb-1">الموكل</p>
+            <p className="text-sm font-bold text-gray-700">{c.clientName || 'غير محدد'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex bg-white p-2 gap-2 sticky top-16 z-30 border-b border-gray-100 overflow-x-auto no-scrollbar">
+        {[
+          { id: 'info', label: 'البيانات', icon: Info },
+          { id: 'sessions', label: 'الجلسات', icon: CalendarIcon },
+          { id: 'finance', label: 'الحسابات', icon: CreditCard },
+          { id: 'docs', label: 'الأرشيف', icon: FileText }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0",
+              activeTab === tab.id ? "bg-blue-600 text-white shadow-lg" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+            )}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-4">
+        {activeTab === 'info' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-6">
+              <h3 className="font-bold text-gray-900 border-r-4 border-blue-600 pr-3">بيانات الخصوم</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                  <span className="text-gray-500 text-sm">الخصم</span>
+                  <span className="font-bold text-gray-800">{c.opponentName || 'غير مسجل'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-500 text-sm">تاريخ البدء</span>
+                  <span className="font-bold text-gray-800">{c.date}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'sessions' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            {caseSessions.length === 0 ? (
+              <div className="bg-white p-12 rounded-[32px] text-center space-y-4">
+                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto">
+                  <CalendarIcon className="w-8 h-8 text-blue-600" />
+                </div>
+                <p className="text-gray-400 font-bold">لا توجد جلسات مسجلة لهذه القضية</p>
+              </div>
+            ) : (
+              caseSessions.map((s: any) => (
+                <div key={s.id} className="bg-white p-5 rounded-[32px] border border-gray-100 shadow-sm space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">{s.date}</span>
+                    <span className="text-[10px] text-gray-400">{s.time}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-gray-800"><span className="text-gray-400 ml-2">المحكمة:</span> {s.court}</p>
+                    <p className="text-sm font-bold text-gray-800"><span className="text-gray-400 ml-2">الطلبات:</span> {s.demands || '---'}</p>
+                    <div className="mt-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                      <p className="text-[10px] text-emerald-600 font-black mb-1">القرار:</p>
+                      <p className="text-sm font-bold text-emerald-800">{s.decision || 'بانتظار القرار...'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'finance' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            {/* Fees Card */}
+            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-[32px] shadow-xl text-white">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold">أتعاب القضية</h3>
+                <Coins className="w-6 h-6 opacity-50" />
+              </div>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-100 text-sm">إجمالي الأتعاب</span>
+                  <span className="text-2xl font-black">{c.fees?.total || 0} ج.م</span>
+                </div>
+                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-400" 
+                    style={{ width: `${((c.fees?.paid || 0) / (c.fees?.total || 1)) * 100}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <p className="text-[10px] text-blue-200 font-bold mb-1">المدفوع</p>
+                    <p className="font-bold">{c.fees?.paid || 0} ج.م</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] text-blue-200 font-bold mb-1">المتبقي</p>
+                    <p className="font-bold text-orange-300">{c.fees?.remaining || 0} ج.م</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses List */}
+            <div className="bg-white p-6 rounded-[32px] border border-gray-100 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-gray-900">المصاريف القضائية</h3>
+                <span className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full">
+                  إجمالي: {c.expenses?.total || 0} ج.م
+                </span>
+              </div>
+              <div className="space-y-3">
+                {(c.expenses?.items || []).map((ex: any) => (
+                  <div key={ex.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{ex.reason}</p>
+                      <p className="text-[10px] text-gray-400">{ex.date}</p>
+                    </div>
+                    <span className="font-bold text-gray-700">{ex.amount} ج.م</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'docs' && (activeTab === 'docs' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <button className="flex flex-col items-center justify-center p-6 bg-white rounded-[32px] border-2 border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all group">
+                <Camera className="w-8 h-8 text-gray-300 group-hover:text-blue-500 mb-2" />
+                <span className="text-xs font-bold text-gray-400 group-hover:text-blue-600">تصوير مستند</span>
+              </button>
+              <button className="flex flex-col items-center justify-center p-6 bg-white rounded-[32px] border-2 border-dashed border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-all group">
+                <FileText className="w-8 h-8 text-gray-300 group-hover:text-emerald-500 mb-2" />
+                <span className="text-xs font-bold text-gray-400 group-hover:text-emerald-600">إضافة ملف</span>
+              </button>
+            </div>
+            
+            <div className="space-y-3 pt-4">
+              {(c.documents || []).length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 text-sm font-bold">الأرشيف فارغ حالياً</p>
+                </div>
+              ) : (
+                c.documents.map((doc: any) => (
+                  <div key={doc.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-800">{doc.name}</p>
+                        <p className="text-[10px] text-gray-400">{doc.date}</p>
+                      </div>
+                    </div>
+                    <button className="p-2 text-gray-400 hover:text-blue-600"><Download className="w-5 h-5" /></button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const FinanceScreen = ({ onBack, data, updateData }: any) => {
+  const finance = data.finance || [];
+  const totalIncome = finance.filter((f: any) => f.type === 'income').reduce((sum: number, f: any) => sum + f.amount, 0);
+  const totalExpenses = finance.filter((f: any) => f.type === 'expense').reduce((sum: number, f: any) => sum + f.amount, 0);
+  const balance = totalIncome - totalExpenses;
+
+  return (
+    <div className="pb-32 bg-gray-50 min-h-screen">
+      <Header title="حسابات المكتب" onBack={onBack} />
+      
+      <div className="p-4 space-y-6">
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 gap-4">
+          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-6 rounded-[32px] shadow-xl text-white">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-emerald-100 font-bold">الرصيد الحالي</span>
+              <PieChart className="w-6 h-6 opacity-50" />
+            </div>
+            <h2 className="text-4xl font-black">{balance.toLocaleString()} ج.م</h2>
+            <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/10">
+              <div>
+                <p className="text-[10px] text-emerald-100 font-bold mb-1 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> إجمالي الدخل
+                </p>
+                <p className="text-lg font-bold">{totalIncome.toLocaleString()}</p>
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] text-emerald-100 font-bold mb-1 flex items-center gap-1 justify-end">
+                  <TrendingDown className="w-3 h-3" /> إجمالي المصاريف
+                </p>
+                <p className="text-lg font-bold">{totalExpenses.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Transactions List */}
+        <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-5 border-b border-gray-50 flex justify-between items-center">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <History className="w-5 h-5 text-blue-600" /> آخر العمليات
+            </h3>
+            <button className="text-blue-600 text-xs font-black">+ إضافة</button>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {finance.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">لا توجد عمليات مسجلة</div>
+            ) : (
+              [...finance].reverse().map((f: any) => (
+                <div key={f.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-10 h-10 rounded-2xl flex items-center justify-center",
+                      f.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                    )}>
+                      {f.type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-800">{f.reason}</p>
+                      <p className="text-[10px] text-gray-400">{f.date}</p>
+                    </div>
+                  </div>
+                  <span className={cn(
+                    "font-black",
+                    f.type === 'income' ? "text-emerald-600" : "text-red-600"
+                  )}>
+                    {f.type === 'income' ? '+' : '-'}{f.amount}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const BailiffsScreen = ({ onBack }: { onBack: () => void }) => {
   const [procedures, setProcedures] = useState([
@@ -4192,6 +4529,8 @@ export default function App() {
               <Route path="/gov-platforms" element={isLoggedIn ? <GovPlatformsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               
               <Route path="/cases" element={isLoggedIn ? <CasesScreen onBack={() => navigate(-1)} cases={data?.cases || []} onAdd={addCase} onDelete={deleteCase} /> : <Navigate to="/" />} />
+              <Route path="/cases/:id" element={isLoggedIn ? <CaseDetailsScreen onBack={() => navigate(-1)} cases={data?.cases || []} sessions={data?.sessions || []} updateData={updateData} showToast={showToast} /> : <Navigate to="/" />} />
+              <Route path="/finance" element={isLoggedIn ? <FinanceScreen onBack={() => navigate(-1)} data={data} updateData={updateData} /> : <Navigate to="/" />} />
               <Route path="/clients" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="client" /> : <Navigate to="/" />} />
               <Route path="/opponents" element={isLoggedIn ? <ClientsScreen onBack={() => navigate(-1)} clients={data?.clients || []} onAdd={addClient} onDelete={deleteClient} type="opponent" /> : <Navigate to="/" />} />
               <Route path="/sessions" element={isLoggedIn ? <SessionsScreen onBack={() => navigate(-1)} sessions={data?.sessions || []} onDelete={deleteSession} /> : <Navigate to="/" />} />
