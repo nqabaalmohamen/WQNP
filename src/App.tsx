@@ -2539,7 +2539,7 @@ const FinanceScreen = ({ onBack, data, updateData }: any) => {
 };
 
 const PlaceholderScreen = ({ title, onBack }: { title: string, onBack: () => void }) => (
-  <div className="min-h-screen bg-gray-50 flex flex-col">
+  <div className="min-h-screen bg-gray-50 flex flex-col" dir="rtl">
     <Header title={title} onBack={onBack} />
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
       <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center">
