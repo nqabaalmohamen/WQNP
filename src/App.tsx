@@ -364,11 +364,14 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   if (url === '/api/auth/login') {
-    const user = currentDb.users.find((u: any) => u.phone === body.phone && u.password === body.password);
-    if (!user) return createResponse(false, 401, { error: "خطأ: رقم الهاتف أو كلمة المرور غير صحيحة" });
-    if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
-    if (user.status === 'suspended') return createResponse(false, 403, { error: "هذا الحساب محظور قم بالتواصل مع ادارة الحاسب الالي بنقابة المحامين بالفيوم" });
-    return createResponse(true, 200, { user });
+    // محاولة إضافية للتأكد من مزامنة كلمة المرور الجديدة
+    const user = currentDb.users.find((u: any) => u.phone === body.phone);
+    if (user && user.password === body.password) {
+      if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
+      if (user.status === 'suspended') return createResponse(false, 403, { error: "هذا الحساب محظور قم بالتواصل مع ادارة الحاسب الالي بنقابة المحامين بالفيوم" });
+      return createResponse(true, 200, { user });
+    }
+    return createResponse(false, 401, { error: "خطأ: رقم الهاتف أو كلمة المرور غير صحيحة" });
   }
 
   if (url === '/api/auth/forgot-password') {
@@ -687,7 +690,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const BUILD_DATE = "2026-03-28 15:20";
+const BUILD_DATE = "2026-03-28 15:30";
 
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
@@ -3302,6 +3305,7 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const [hasBiometricUser, setHasBiometricUser] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const checkBiometrics = async () => {
@@ -3337,6 +3341,7 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
       
       if (credential) {
         setIsLoggingIn(true);
+        setIsSyncing(true);
         // محاكاة تسجيل الدخول باستخدام البيانات المحفوظة محلياً والموثقة بالبصمة
         const currentDb = await loadFromSupabase();
         const user = currentDb.users.find((u: any) => u.phone === savedPhone);
@@ -3355,12 +3360,14 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
       }
     } finally {
       setIsLoggingIn(false);
+      setIsSyncing(false);
     }
   };
 
   const handleLogin = async () => {
     if (!phone || !password) return showToast('يرجى إدخال رقم الهاتف وكلمة المرور', 'error');
     setIsLoggingIn(true);
+    setIsSyncing(true);
     try {
       const response = await apiFetch('/api/auth/login', {
         method: 'POST',
@@ -3391,6 +3398,7 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
       showToast('حدث خطأ في الاتصال بالخادم. يرجى التأكد من اتصالك بالإنترنت.', 'error');
     } finally {
       setIsLoggingIn(false);
+      setIsSyncing(false);
     }
   };
 
@@ -3465,9 +3473,14 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
           <button 
             onClick={handleLogin}
             disabled={isLoggingIn}
-            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-900/20 cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-900/20 cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isLoggingIn ? 'جاري الدخول...' : 'دخول'}
+            {isLoggingIn ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {isSyncing ? 'جاري مزامنة البيانات...' : 'جاري الدخول...'}
+              </>
+            ) : 'دخول'}
           </button>
 
           {isBiometricSupported && hasBiometricUser && (
