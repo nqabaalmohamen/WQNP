@@ -677,7 +677,7 @@ const SplashIntro = ({ onComplete }: { onComplete: () => void }) => {
   );
 };
 
-const BUILD_DATE = "2026-03-28 14:55";
+const BUILD_DATE = "2026-03-28 15:05";
 
 const Header = ({ title, onBack, onMenu, showLogo = true, notificationsCount = 0 }: { title: string, onBack?: () => void, onMenu?: () => void, showLogo?: boolean, notificationsCount?: number }) => {
   const navigate = useNavigate();
@@ -4192,7 +4192,7 @@ const SettingsGroup = ({ title, icon: Icon, children, defaultOpen = true }: any)
   );
 };
 
-const ProfileScreen = ({ user, onLogout, onBack, showToast, requestConfirm }: { user: any, onLogout: () => void, onBack: () => void, showToast: (m: string, t: any) => void, requestConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
+const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, showToast, requestConfirm }: { user: any, setUser: (u: any) => void, data: any, updateData: (u: any) => void, onLogout: () => void, onBack: () => void, showToast: (m: string, t: any) => void, requestConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -4247,17 +4247,30 @@ const ProfileScreen = ({ user, onLogout, onBack, showToast, requestConfirm }: { 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: user.phone, oldPassword, newPassword })
       });
-      const data = await response.json();
+      const resData = await response.json();
       if (response.ok) {
-        showToast(data.message, 'success');
+        // تحديث الحالة العالمية لضمان حفظ كلمة المرور في السحابة وفي الحالة الحالية
+        const updatedUsers = (data?.users || []).map((u: any) => 
+          u.phone === user.phone ? { ...u, password: newPassword } : u
+        );
+        
+        await updateData({ users: updatedUsers });
+        
+        // تحديث كائن المستخدم الحالي
+        const updatedUser = { ...user, password: newPassword };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        showToast(resData.message, 'success');
         setIsChangingPassword(false);
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        showToast(data.error, 'error');
+        showToast(resData.error, 'error');
       }
     } catch (error) {
+      console.error("Change Password Error:", error);
       showToast('خطأ في الاتصال', 'error');
     } finally {
       setIsLoading(false);
@@ -4922,7 +4935,7 @@ export default function App() {
                 showToast('تم حذف الإشعار', 'success');
               }} /> : <Navigate to="/" />} />
               
-              <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
+              <Route path="/profile" element={isLoggedIn ? <ProfileScreen user={user} setUser={setUser} data={data} updateData={updateData} onLogout={logout} onBack={() => navigate(-1)} showToast={showToast} requestConfirm={requestConfirm} /> : <Navigate to="/" />} />
               <Route path="/judicial-distribution" element={isLoggedIn ? <JudicialDistributionScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               <Route path="/tax-declarations" element={isLoggedIn ? <TaxDeclarationsScreen onBack={() => navigate(-1)} /> : <Navigate to="/" />} />
               <Route path="/writing" element={isLoggedIn ? <WritingScreen onBack={() => navigate(-1)} showToast={showToast} /> : <Navigate to="/" />} />
