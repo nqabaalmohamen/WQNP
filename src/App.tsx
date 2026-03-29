@@ -343,6 +343,14 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   const body = options.body ? JSON.parse(options.body) : null;
+  // تنظيف البيانات الواردة (Trimming)
+  if (body) {
+    if (body.phone) body.phone = String(body.phone).trim();
+    if (body.password) body.password = String(body.password).trim();
+    if (body.oldPassword) body.oldPassword = String(body.oldPassword).trim();
+    if (body.newPassword) body.newPassword = String(body.newPassword).trim();
+  }
+
   const createResponse = (ok: boolean, status: number, data: any) => ({
     ok,
     status,
@@ -350,23 +358,29 @@ const mockFetch = async (url: string, options: any = {}) => {
     text: async () => JSON.stringify(data)
   });
 
-  // Always fetch fresh from cloud for every API call
+  // Always fetch fresh from cloud for every API call to ensure we work with latest data
   let currentDb = await loadFromSupabase();
 
   if (url === '/api/auth/signup') {
-    if (currentDb.users.find((u: any) => u.phone === body.phone)) {
+    const trimmedPhone = body.phone;
+    if (currentDb.users.find((u: any) => u.phone.trim() === trimmedPhone)) {
       return createResponse(false, 400, { error: "خطأ: رقم الهاتف هذا مسجل مسبقاً" });
     }
-    currentDb.users.push({ ...body, status: 'pending', role: 'user', notifications: [] });
+    const newUser = { ...body, phone: trimmedPhone, status: 'pending', role: 'user', notifications: [] };
+    currentDb.users.push(newUser);
     saveLocalDB(currentDb);
     await syncToSupabase(currentDb);
     return createResponse(true, 200, { message: "تم إنشاء حساب جديد و سوف تتم الموافقة على الحساب في اقرب وقت من قبل نقابة المحامين للفيوم" });
   }
 
   if (url === '/api/auth/login') {
-    // محاولة إضافية للتأكد من مزامنة كلمة المرور الجديدة
-    const user = currentDb.users.find((u: any) => u.phone === body.phone);
-    if (user && user.password === body.password) {
+    const trimmedPhone = body.phone;
+    const trimmedPassword = body.password;
+    
+    // البحث عن المستخدم مع تنظيف البيانات للمقارنة
+    const user = currentDb.users.find((u: any) => u.phone.trim() === trimmedPhone);
+    
+    if (user && user.password.trim() === trimmedPassword) {
       if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
       if (user.status === 'suspended') return createResponse(false, 403, { error: "هذا الحساب محظور قم بالتواصل مع ادارة الحاسب الالي بنقابة المحامين بالفيوم" });
       return createResponse(true, 200, { user });
@@ -375,9 +389,16 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   if (url === '/api/auth/forgot-password') {
-    const user = currentDb.users.find((u: any) => u.phone === body.phone);
+    const trimmedPhone = body.phone;
+    const user = currentDb.users.find((u: any) => u.phone.trim() === trimmedPhone);
     if (!user) return createResponse(false, 404, { error: "خطأ: رقم الهاتف غير مسجل لدينا" });
-    currentDb.resetRequests.push({ phone: body.phone, name: user.name, timestamp: new Date().toISOString(), status: 'pending' });
+    
+    currentDb.resetRequests.push({ 
+      phone: trimmedPhone, 
+      name: user.name, 
+      timestamp: new Date().toISOString(), 
+      status: 'pending' 
+    });
     saveLocalDB(currentDb);
     await syncToSupabase(currentDb);
     return createResponse(true, 200, { message: "تم إرسال طلب استعادة كلمة المرور. سيقوم المسؤول بالتواصل معك قريباً." });
@@ -448,14 +469,20 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   if (url === '/api/auth/change-password') {
-    const user = currentDb.users.find((u: any) => u.phone === body.phone);
+    const trimmedPhone = body.phone;
+    const trimmedOldPassword = body.oldPassword;
+    const trimmedNewPassword = body.newPassword;
+    
+    const user = currentDb.users.find((u: any) => u.phone.trim() === trimmedPhone);
     if (user) {
-      if (user.password !== body.oldPassword) {
+      if (user.password.trim() !== trimmedOldPassword) {
         return createResponse(false, 400, { error: "كلمة المرور القديمة غير صحيحة" });
       }
-      user.password = body.newPassword;
-      // لا نحتاج للمزامنة هنا لأن ProfileScreen سيقوم باستدعاء updateData التي تقوم بالمزامنة
-      return createResponse(true, 200, { message: "تم التحقق وتغيير كلمة المرور بنجاح" });
+      user.password = trimmedNewPassword;
+      // الحفظ المباشر في السحابة لضمان المزامنة الفورية قبل أي عملية دخول أخرى
+      saveLocalDB(currentDb);
+      await syncToSupabase(currentDb);
+      return createResponse(true, 200, { message: "تم تغيير كلمة المرور بنجاح ومزامنتها سحابياً" });
     }
     return createResponse(false, 404, { error: "المستخدم غير موجود" });
   }
@@ -3365,14 +3392,17 @@ const LoginScreen = ({ onLogin, showToast }: { onLogin: (u: any) => void, showTo
   };
 
   const handleLogin = async () => {
-    if (!phone || !password) return showToast('يرجى إدخال رقم الهاتف وكلمة المرور', 'error');
+    const trimmedPhone = phone.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedPhone || !trimmedPassword) return showToast('يرجى إدخال رقم الهاتف وكلمة المرور', 'error');
     setIsLoggingIn(true);
     setIsSyncing(true);
     try {
       const response = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password })
+        body: JSON.stringify({ phone: trimmedPhone, password: trimmedPassword })
       });
       
       let data;
@@ -3513,13 +3543,17 @@ const SignupScreen = ({ onSignup, showToast }: { onSignup: () => void, showToast
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
-    if (!name || !phone || !password) return showToast('يرجى إكمال البيانات الأساسية', 'error');
+    const trimmedPhone = phone.trim();
+    const trimmedPassword = password.trim();
+    const trimmedName = name.trim();
+
+    if (!trimmedName || !trimmedPhone || !trimmedPassword) return showToast('يرجى إكمال البيانات الأساسية', 'error');
     setIsLoading(true);
     try {
       const response = await apiFetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, password, regNo })
+        body: JSON.stringify({ name: trimmedName, phone: trimmedPhone, password: trimmedPassword, regNo })
       });
       const data = await response.json();
       if (response.ok) {
@@ -4259,22 +4293,27 @@ const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, show
   };
 
   const handleChangePassword = async () => {
-    if (!oldPassword) return showToast('يرجى إدخال كلمة المرور القديمة', 'error');
-    if (!newPassword) return showToast('يرجى إدخال كلمة المرور الجديدة', 'error');
-    if (newPassword !== confirmPassword) return showToast('كلمة المرور الجديدة غير متطابقة', 'error');
+    const trimmedOld = oldPassword.trim();
+    const trimmedNew = newPassword.trim();
+    const trimmedConfirm = confirmPassword.trim();
+
+    if (!trimmedOld) return showToast('يرجى إدخال كلمة المرور القديمة', 'error');
+    if (!trimmedNew) return showToast('يرجى إدخال كلمة المرور الجديدة', 'error');
+    if (trimmedNew !== trimmedConfirm) return showToast('كلمة المرور الجديدة غير متطابقة', 'error');
     
     setIsLoading(true);
     try {
       const response = await apiFetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: user.phone, oldPassword, newPassword })
+        body: JSON.stringify({ phone: user.phone, oldPassword: trimmedOld, newPassword: trimmedNew })
       });
       const resData = await response.json();
       if (response.ok) {
-        // 1. تحديث قائمة المستخدمين في قاعدة البيانات الشاملة
-        const updatedUsers = (data?.users || []).map((u: any) => 
-          u.phone === user.phone ? { ...u, password: newPassword } : u
+        // 1. المزامنة الشاملة (محلياً وسحابياً) عبر جلب البيانات الحالية وتحديثها
+        const latestDb = await loadFromSupabase();
+        const updatedUsers = (latestDb?.users || []).map((u: any) => 
+          u.phone === user.phone ? { ...u, password: trimmedNew } : u
         );
         
         // 2. تسجيل الحدث للمسؤول
@@ -4287,16 +4326,16 @@ const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, show
           userName: user.name,
           userPhone: user.phone
         };
-        const currentEvents = Array.isArray(data?.systemEvents) ? data.systemEvents : [];
+        const currentEvents = Array.isArray(latestDb?.systemEvents) ? latestDb.systemEvents : [];
 
-        // 3. المزامنة الشاملة (محلياً وسحابياً)
+        // 3. تحديث قاعدة البيانات الكاملة
         await updateData({ 
           users: updatedUsers,
           systemEvents: [event, ...currentEvents].slice(0, 100)
         });
         
         // 4. تحديث جلسة المستخدم الحالية
-        const updatedUser = { ...user, password: newPassword };
+        const updatedUser = { ...user, password: trimmedNew };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
@@ -4306,7 +4345,7 @@ const ProfileScreen = ({ user, setUser, data, updateData, onLogout, onBack, show
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        showToast(resData.error, 'error');
+        showToast(resData.error || 'حدث خطأ في تغيير كلمة المرور', 'error');
       }
     } catch (error) {
       console.error("Change Password Sync Error:", error);
@@ -4737,12 +4776,24 @@ export default function App() {
   // Helper to update and sync data
   const updateData = async (updates: any) => {
     try {
-      const newData = { ...(data || {}), ...updates };
+      // 1. جلب أحدث نسخة من البيانات من السحابة أولاً لمنع فقدان بيانات الآخرين
+      const currentCloudData = await loadFromSupabase();
+      
+      // 2. دمج التحديثات الجديدة مع أحدث نسخة من السحابة
+      const newData = { ...(currentCloudData || data || {}), ...updates };
+      
+      // 3. تحديث الحالة المحلية والحفظ في التخزين المحلي والسحابي
       setData(newData);
       saveLocalDB(newData);
       await syncToSupabase(newData);
+      
+      return newData;
     } catch (e) {
       console.error("Update data error:", e);
+      // في حالة الفشل، نحدث الحالة المحلية على الأقل
+      const fallbackData = { ...(data || {}), ...updates };
+      setData(fallbackData);
+      return fallbackData;
     }
   };
 
