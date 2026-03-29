@@ -392,9 +392,10 @@ const mockFetch = async (url: string, options: any = {}) => {
 		throw new Error('No internet connection');
 	}
 
-	const body = options.body ? JSON.parse(options.body) : null;
-	// تنظيف البيانات الواردة (Trimming)
-	if (body) {
+	// Parse body if present, otherwise use an empty object so endpoints don't throw
+	const body = options.body ? JSON.parse(options.body) : {};
+	// تنظيف البيانات الواردة (Trimming) - guard each field
+	if (body && typeof body === 'object') {
 		if (body.phone) body.phone = String(body.phone).trim();
 		if (body.password) body.password = String(body.password).trim();
 		if (body.oldPassword) body.oldPassword = String(body.oldPassword).trim();
