@@ -397,18 +397,19 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   if (url === '/api/auth/login') {
-    const trimmedPhone = String(body.phone).trim();
-    const trimmedPassword = String(body.password).trim();
+    const trimmedPhone = String(body.phone || "").trim();
+    const trimmedPassword = String(body.password || "").trim();
     
     // البحث عن المستخدم في القائمة النظيفة (التي لا تحتوي على تكرار)
-    const user = currentDb.users.find((u: any) => String(u.phone).trim() === trimmedPhone);
+    const users = Array.isArray(currentDb?.users) ? currentDb.users : [];
+    const user = users.find((u: any) => String(u.phone || "").trim() === trimmedPhone);
     
-    if (user && String(user.password).trim() === trimmedPassword) {
+    if (user && String(user.password || "").trim() === trimmedPassword) {
       if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
       if (user.status === 'suspended') return createResponse(false, 403, { error: "هذا الحساب محظور قم بالتواصل مع ادارة الحاسب الالي بنقابة المحامين بالفيوم" });
       return createResponse(true, 200, { user });
     }
-    return createResponse(false, 401, { error: "خطأ: رقم الهاتف أو كلمة المرور غير صحيحة" });
+    return createResponse(false, 401, { error: "رقم الهاتف أو كلمة المرور غير صحيحة" });
   }
 
   if (url === '/api/auth/forgot-password') {
@@ -3629,10 +3630,9 @@ const SignupScreen = ({ onSignup, showToast }: { onSignup: () => void, showToast
 };
 
 const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }: { data: any, updateData: any, onBack: () => void, showToast: any, requestConfirm: any }) => {
-  const pendingUsers = (data.users || []).filter((u:any) => u.status === 'pending');
-  // جعل التبويب الافتراضي هو "الكل" إذا لم توجد طلبات معلقة
+  const pendingUsersList = (data?.users || []).filter((u:any) => u.status === 'pending');
   const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings' | 'events' | 'sessions' | 'stats' | 'data'>(
-    pendingUsers.length > 0 ? 'pending' : 'all'
+    pendingUsersList.length > 0 ? 'pending' : 'all'
   );
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyDesc, setNotifyDesc] = useState('');
@@ -3773,10 +3773,10 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
   });
 
   const stats = {
-    total: (data.users || []).length,
+    total: (data?.users || []).length,
     pending: pendingUsersList.length,
-    approved: (data.users || []).filter((u:any) => u.status === 'approved').length,
-    resets: (data.resetRequests || []).length
+    approved: (data?.users || []).filter((u:any) => u.status === 'approved').length,
+    resets: (data?.resetRequests || []).length
   };
 
   return (
