@@ -3764,8 +3764,7 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
     }
   };
 
-  const pendingUsersList = (data.users || []).filter((u:any) => u.status === 'pending');
-  const filteredUsers = (data.users || []).filter((u:any) => {
+  const filteredUsers = (data?.users || []).filter((u:any) => {
     const name = String(u.name || "").toLowerCase();
     const phone = String(u.phone || "");
     const query = searchQuery.toLowerCase();
