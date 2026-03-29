@@ -83,9 +83,10 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 // --- Error Boundary for White Screen Protection ---
-class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { hasError: boolean }> {
+class ErrorBoundary extends React.Component<React.PropsWithChildren<Record<string, unknown>>, { hasError: boolean }> {
+	// ensure props typing includes children so this.props.children is available
 	public state: { hasError: boolean };
-	constructor(props: any) {
+	constructor(props: React.PropsWithChildren<Record<string, unknown>>) {
 		super(props);
 		this.state = { hasError: false };
 	}
@@ -120,7 +121,8 @@ class ErrorBoundary extends React.Component<{ children?: React.ReactNode }, { ha
 				</div>
 			);
 		}
-		return this.props.children;
+	// cast `this` to any before accessing props so TypeScript doesn't check for `props` on the class type
+	return ((this as any).props as any).children;
 	}
 }
 
@@ -625,7 +627,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 		animate={{ opacity: 1, y: 20, x: '-50%' }}
 		exit={{ opacity: 0, y: -50, x: '-50%' }}
 		className={cn(
-			"fixed top-0 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border min-w-[320px] max-w-[90%]",
+			"fixed top-0 left-1/2 z-100 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border min-w-[320px] max-w-[90%]",
 			type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-800" : 
 			type === 'error' ? "bg-red-50 border-red-100 text-red-800" : 
 			"bg-blue-50 border-blue-100 text-blue-800"
@@ -646,7 +648,7 @@ const Toast = ({ message, type, onClose }: { message: string, type: 'success' | 
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen: boolean, title: string, message: string, onConfirm: () => void, onCancel: () => void }) => (
 	<AnimatePresence>
 		{isOpen && (
-			<div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+			<div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
 				<motion.div
 					initial={{ opacity: 0, scale: 0.9 }}
 					animate={{ opacity: 1, scale: 1 }}
