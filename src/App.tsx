@@ -300,25 +300,31 @@ const syncToSupabase = async (newDb: any) => {
 	// تطهير البيانات قبل المزامنة لضمان جودة السحابة
 	const sanitizedDb = sanitizeDB(newDb);
 	const supabase = getSupabase(sanitizedDb);
-	if (!supabase) return false;
-  
+	if (!supabase) {
+		console.warn('Supabase client not available - skipping cloud sync');
+		return false;
+	}
+
 	try {
-		const payloadUpdatedAt = sanitizedDb.updated_at || new Date().toISOString();
+		// ensure we send an explicit updated_at so cloud and local can be compared
+		sanitizedDb.updated_at = sanitizedDb.updated_at || new Date().toISOString();
+		const payloadUpdatedAt = sanitizedDb.updated_at;
+
 		const { error } = await supabase
 			.from('app_data')
-			.upsert({ 
-				id: 1, 
-				content: sanitizedDb, 
-				updated_at: payloadUpdatedAt 
+			.upsert({
+				id: 1,
+				content: sanitizedDb,
+				updated_at: payloadUpdatedAt
 			}, { onConflict: 'id' });
-      
+
 		if (error) {
-			console.error('Supabase Sync Error Details:', error.message);
+			console.error('Supabase Sync Error Details:', error.message || error);
 			return false;
-		} else {
-			console.log('✅ Cloud Sync Successful (Sanitized)');
-			return true;
 		}
+
+		console.log('✅ Cloud Sync Successful (timestamped)');
+		return true;
 	} catch (e) {
 		console.error('Supabase Connection Exception:', e);
 		return false;
@@ -358,24 +364,30 @@ const loadFromSupabase = async () => {
 			if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey.includes("MY_GEMINI")) {
 				cloudDb.geminiApiKey = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
 			}
-      
+
 			// Compare timestamps to avoid overwriting newer local changes
-			const cloudUpdated = data.updated_at ? Date.parse(data.updated_at) : 0;
-			const localUpdated = localDb?.updated_at ? Date.parse(localDb.updated_at) : 0;
+			const cloudUpdated = data.updated_at ? Date.parse(String(data.updated_at)) : 0;
+			const localUpdated = localDb?.updated_at ? Date.parse(String(localDb.updated_at)) : 0;
 
 			if (cloudUpdated > localUpdated) {
+				// cloud is newer -> accept cloud and store locally
 				cloudDb.updated_at = data.updated_at || new Date().toISOString();
 				saveLocalDB(cloudDb);
+				console.log('⬇️ Loaded newer state from cloud');
 				return cloudDb;
 			} else if (localUpdated > cloudUpdated) {
-				// local is newer -> push local up and keep local
+				// local is newer -> push local to cloud and keep local
 				try {
-					await syncToSupabase(localDb);
+					const localSanitized = sanitizeDB(localDb);
+					localSanitized.updated_at = localSanitized.updated_at || new Date().toISOString();
+					const pushed = await syncToSupabase(localSanitized);
+					if (pushed) console.log('⬆️ Pushed newer local state to cloud');
 				} catch (e) {
 					console.warn('Background push failed:', e);
 				}
 				return localDb;
 			} else {
+				// same timestamp (or both missing) -> prefer local to avoid accidental rollback
 				return localDb;
 			}
 		} else {
