@@ -3622,7 +3622,11 @@ const SignupScreen = ({ onSignup, showToast }: { onSignup: () => void, showToast
 };
 
 const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }: { data: any, updateData: any, onBack: () => void, showToast: any, requestConfirm: any }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings' | 'events' | 'sessions' | 'stats' | 'data'>('pending');
+  const pendingUsers = (data.users || []).filter((u:any) => u.status === 'pending');
+  // جعل التبويب الافتراضي هو "الكل" إذا لم توجد طلبات معلقة
+  const [activeTab, setActiveTab] = useState<'pending' | 'resets' | 'all' | 'notify' | 'settings' | 'events' | 'sessions' | 'stats' | 'data'>(
+    pendingUsers.length > 0 ? 'pending' : 'all'
+  );
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyDesc, setNotifyDesc] = useState('');
   const [selectedUser, setSelectedUser] = useState<string | null>(null); // null means all
@@ -3753,15 +3757,17 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
     }
   };
 
-  const pendingUsers = (data.users || []).filter((u:any) => u.status === 'pending');
-  const filteredUsers = (data.users || []).filter((u:any) => 
-    u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    u.phone?.includes(searchQuery)
-  );
+  const pendingUsersList = (data.users || []).filter((u:any) => u.status === 'pending');
+  const filteredUsers = (data.users || []).filter((u:any) => {
+    const name = String(u.name || "").toLowerCase();
+    const phone = String(u.phone || "");
+    const query = searchQuery.toLowerCase();
+    return name.includes(query) || phone.includes(query);
+  });
 
   const stats = {
     total: (data.users || []).length,
-    pending: pendingUsers.length,
+    pending: pendingUsersList.length,
     approved: (data.users || []).filter((u:any) => u.status === 'approved').length,
     resets: (data.resetRequests || []).length
   };
@@ -3803,7 +3809,7 @@ const AdminDashboard = ({ data, updateData, onBack, showToast, requestConfirm }:
 
       <div className="flex border-b bg-white overflow-x-auto sticky top-0 z-10">
         <button onClick={() => setActiveTab('pending')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'pending' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
-          طلبات الانضمام ({pendingUsers.length})
+          طلبات الانضمام ({pendingUsersList.length})
         </button>
         <button onClick={() => setActiveTab('resets')} className={`px-4 py-4 text-xs font-bold whitespace-nowrap transition-colors ${activeTab === 'resets' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/30' : 'text-slate-500 hover:bg-slate-50'}`}>
           نسيان كلمة السر ({data.resetRequests.length})
