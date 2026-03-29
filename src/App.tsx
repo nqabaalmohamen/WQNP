@@ -322,14 +322,16 @@ const loadFromSupabase = async () => {
     if (data && data.length > 0 && data[0].content) {
       let cloudDb = data[0].content;
       
-      // --- تنظيف وتوحيد البيانات (Deduplication) ---
+      // --- تنظيف وتوحيد البيانات بشكل صارم (Strict Deduplication) ---
       if (cloudDb.users && Array.isArray(cloudDb.users)) {
         const uniqueUsers = new Map();
         cloudDb.users.forEach((u: any) => {
           if (u && u.phone) {
             const phone = String(u.phone).trim();
-            // الإبقاء على السجل الأحدث (الموجود لاحقاً في المصفوفة)
-            uniqueUsers.set(phone, { ...u, phone });
+            // الاحتفاظ بأول سجل فقط وتجاهل المكررات اللاحقة
+            if (!uniqueUsers.has(phone)) {
+              uniqueUsers.set(phone, { ...u, phone });
+            }
           }
         });
         cloudDb.users = Array.from(uniqueUsers.values());
@@ -391,9 +393,8 @@ const mockFetch = async (url: string, options: any = {}) => {
     const trimmedPhone = String(body.phone).trim();
     const trimmedPassword = String(body.password).trim();
     
-    // البحث عن المستخدم مع تنظيف البيانات للمقارنة
-    // استخدام reverse لضمان أننا نجد السجل الأحدث في حالة التكرار
-    const user = [...currentDb.users].reverse().find((u: any) => String(u.phone).trim() === trimmedPhone);
+    // البحث عن المستخدم في القائمة النظيفة (التي لا تحتوي على تكرار)
+    const user = currentDb.users.find((u: any) => String(u.phone).trim() === trimmedPhone);
     
     if (user && String(user.password).trim() === trimmedPassword) {
       if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
@@ -4797,14 +4798,16 @@ export default function App() {
       // 2. دمج التحديثات الجديدة مع أحدث نسخة من السحابة
       let newData = { ...(currentCloudData || data || {}), ...updates };
       
-      // 3. تنظيف وتوحيد المستخدمين (Deduplication) قبل الحفظ لضمان عدم وجود تكرار
+      // 3. تنظيف وتوحيد المستخدمين بشكل صارم قبل الحفظ
       if (newData.users && Array.isArray(newData.users)) {
         const uniqueUsers = new Map();
         newData.users.forEach((u: any) => {
           if (u && u.phone) {
             const phone = String(u.phone).trim();
-            // الإبقاء على الأحدث
-            uniqueUsers.set(phone, { ...u, phone });
+            // الاحتفاظ بأول نسخة فقط
+            if (!uniqueUsers.has(phone)) {
+              uniqueUsers.set(phone, { ...u, phone });
+            }
           }
         });
         newData.users = Array.from(uniqueUsers.values());
