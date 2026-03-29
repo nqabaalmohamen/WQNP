@@ -249,9 +249,32 @@ const initializeDB = () => {
   return initialDB;
 };
 
+const sanitizeDB = (db: any) => {
+  if (!db) return db;
+  const newDb = { ...db };
+  
+  if (newDb.users && Array.isArray(newDb.users)) {
+    const uniqueUsers = new Map();
+    // ترتيب المستخدمين بحيث يكون الأحدث في الأخير، ثم نأخذ الأحدث دائماً
+    newDb.users.forEach((u: any) => {
+      if (u && u.phone) {
+        const phone = String(u.phone).trim();
+        // إذا وجدنا تكراراً، السجل الأحدث (الذي يأتي لاحقاً) هو الذي سيعتمد
+        uniqueUsers.set(phone, { ...u, phone });
+      }
+    });
+    newDb.users = Array.from(uniqueUsers.values());
+  }
+
+  if (!newDb.resetRequests) newDb.resetRequests = [];
+  if (!newDb.systemEvents) newDb.systemEvents = [];
+  
+  return newDb;
+};
+
 const saveLocalDB = (db: any) => {
-  // نحفظ البيانات محلياً دائماً لضمان استمرارية العمل حتى عند انقطاع الإنترنت
-  localStorage.setItem('lawyer_app_db', JSON.stringify(db));
+  const sanitized = sanitizeDB(db);
+  localStorage.setItem('lawyer_app_db', JSON.stringify(sanitized));
 };
 
 const getSupabase = (db: any) => {
@@ -268,24 +291,24 @@ const syncToSupabase = async (newDb: any) => {
     return;
   }
   
-  // التأكد من أن البيانات المرسلة هي أحدث كائن
-  const supabase = getSupabase(newDb);
+  // تطهير البيانات قبل المزامنة لضمان جودة السحابة
+  const sanitizedDb = sanitizeDB(newDb);
+  const supabase = getSupabase(sanitizedDb);
   if (!supabase) return;
   
   try {
-    // محاولة المزامنة مع Supabase
     const { error } = await supabase
       .from('app_data')
       .upsert({ 
         id: 1, 
-        content: newDb, 
+        content: sanitizedDb, 
         updated_at: new Date().toISOString() 
       }, { onConflict: 'id' });
       
     if (error) {
-      console.error('Supabase Sync Error Details:', error.message, error.details, error.hint);
+      console.error('Supabase Sync Error Details:', error.message);
     } else {
-      console.log('✅ Cloud Sync Successful');
+      console.log('✅ Cloud Sync Successful (Sanitized)');
     }
   } catch (e) {
     console.error('Supabase Connection Exception:', e);
@@ -306,36 +329,20 @@ const loadFromSupabase = async () => {
   }
   
   try {
-    // إضافة پارامتر عشوائي لمنع الكاش (Cache Busting)
     const { data, error } = await supabase
       .from('app_data')
       .select('content, updated_at')
       .eq('id', 1)
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .single();
     
     if (error) {
       console.error('Supabase fetch error:', error.message);
       return localDb;
     }
 
-    if (data && data.length > 0 && data[0].content) {
-      let cloudDb = data[0].content;
-      
-      // --- تنظيف وتوحيد البيانات بشكل صارم (Strict Deduplication) ---
-      if (cloudDb.users && Array.isArray(cloudDb.users)) {
-        const uniqueUsers = new Map();
-        cloudDb.users.forEach((u: any) => {
-          if (u && u.phone) {
-            const phone = String(u.phone).trim();
-            // الاحتفاظ بأول سجل فقط وتجاهل المكررات اللاحقة
-            if (!uniqueUsers.has(phone)) {
-              uniqueUsers.set(phone, { ...u, phone });
-            }
-          }
-        });
-        cloudDb.users = Array.from(uniqueUsers.values());
-      }
+    if (data && data.content) {
+      // تطهير البيانات القادمة من السحابة قبل استخدامها
+      const cloudDb = sanitizeDB(data.content);
       
       // ضمان وجود مفاتيح النظام الأساسية
       if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey.includes("MY_GEMINI")) {
