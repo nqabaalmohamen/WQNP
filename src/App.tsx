@@ -306,10 +306,13 @@ const loadFromSupabase = async () => {
   }
   
   try {
+    // إضافة پارامتر عشوائي لمنع الكاش (Cache Busting)
     const { data, error } = await supabase
       .from('app_data')
-      .select('content')
-      .eq('id', 1);
+      .select('content, updated_at')
+      .eq('id', 1)
+      .order('updated_at', { ascending: false })
+      .limit(1);
     
     if (error) {
       console.error('Supabase fetch error:', error.message);
@@ -317,18 +320,29 @@ const loadFromSupabase = async () => {
     }
 
     if (data && data.length > 0 && data[0].content) {
-      const cloudDb = data[0].content;
+      let cloudDb = data[0].content;
       
-      // التأكد من أن مفتاح Gemini موجود دائماً حتى لو فقد في السحابة
-      if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey === "MY_GEMINI_API_KEY" || cloudDb.geminiApiKey === "AIzaSyBzGCWEiGVvn_32VnU8fsxoteqr5sWCkTA") {
+      // --- تنظيف وتوحيد البيانات (Deduplication) ---
+      if (cloudDb.users && Array.isArray(cloudDb.users)) {
+        const uniqueUsers = new Map();
+        cloudDb.users.forEach((u: any) => {
+          if (u && u.phone) {
+            const phone = String(u.phone).trim();
+            // الإبقاء على السجل الأحدث (الموجود لاحقاً في المصفوفة)
+            uniqueUsers.set(phone, { ...u, phone });
+          }
+        });
+        cloudDb.users = Array.from(uniqueUsers.values());
+      }
+      
+      // ضمان وجود مفاتيح النظام الأساسية
+      if (!cloudDb.geminiApiKey || cloudDb.geminiApiKey.includes("MY_GEMINI")) {
         cloudDb.geminiApiKey = "AIzaSyDuhZIQ3E95ePF6746V59W_PvRJzO92s8Q";
       }
       
       saveLocalDB(cloudDb);
       return cloudDb;
     } else {
-      // إذا كانت السحابة فارغة، نقوم برفع البيانات المحلية الحالية كنسخة أولية
-      await syncToSupabase(localDb);
       return localDb;
     }
   } catch (e) {
@@ -374,13 +388,14 @@ const mockFetch = async (url: string, options: any = {}) => {
   }
 
   if (url === '/api/auth/login') {
-    const trimmedPhone = body.phone;
-    const trimmedPassword = body.password;
+    const trimmedPhone = String(body.phone).trim();
+    const trimmedPassword = String(body.password).trim();
     
     // البحث عن المستخدم مع تنظيف البيانات للمقارنة
-    const user = currentDb.users.find((u: any) => u.phone.trim() === trimmedPhone);
+    // استخدام reverse لضمان أننا نجد السجل الأحدث في حالة التكرار
+    const user = [...currentDb.users].reverse().find((u: any) => String(u.phone).trim() === trimmedPhone);
     
-    if (user && user.password.trim() === trimmedPassword) {
+    if (user && String(user.password).trim() === trimmedPassword) {
       if (user.status === 'pending') return createResponse(false, 403, { error: "حسابك قيد المراجعة حالياً" });
       if (user.status === 'suspended') return createResponse(false, 403, { error: "هذا الحساب محظور قم بالتواصل مع ادارة الحاسب الالي بنقابة المحامين بالفيوم" });
       return createResponse(true, 200, { user });
@@ -4780,9 +4795,22 @@ export default function App() {
       const currentCloudData = await loadFromSupabase();
       
       // 2. دمج التحديثات الجديدة مع أحدث نسخة من السحابة
-      const newData = { ...(currentCloudData || data || {}), ...updates };
+      let newData = { ...(currentCloudData || data || {}), ...updates };
       
-      // 3. تحديث الحالة المحلية والحفظ في التخزين المحلي والسحابي
+      // 3. تنظيف وتوحيد المستخدمين (Deduplication) قبل الحفظ لضمان عدم وجود تكرار
+      if (newData.users && Array.isArray(newData.users)) {
+        const uniqueUsers = new Map();
+        newData.users.forEach((u: any) => {
+          if (u && u.phone) {
+            const phone = String(u.phone).trim();
+            // الإبقاء على الأحدث
+            uniqueUsers.set(phone, { ...u, phone });
+          }
+        });
+        newData.users = Array.from(uniqueUsers.values());
+      }
+
+      // 4. تحديث الحالة المحلية والحفظ في التخزين المحلي والسحابي
       setData(newData);
       saveLocalDB(newData);
       await syncToSupabase(newData);
